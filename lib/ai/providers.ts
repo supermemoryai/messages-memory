@@ -32,7 +32,7 @@ export const myProvider = isTestEnvironment
           middleware: extractReasoningMiddleware({ tagName: 'think' }),
         }),
         'title-model': google('gemini-2.5-flash-preview-04-17'),
-        'artifact-model': google('gemini-2.5-flash-preview-04-17'),
+        'artifact-model': xai('grok-2-1212'),
       },
       imageModels: {
         'small-model': google.imageModel
