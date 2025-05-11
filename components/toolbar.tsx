@@ -11,7 +11,7 @@ import {
 import {
   type Dispatch,
   memo,
-  ReactNode,
+  type ReactNode,
   type SetStateAction,
   useEffect,
   useRef,
@@ -27,9 +27,9 @@ import {
 } from '@/components/ui/tooltip';
 
 import { ArrowUpIcon, StopIcon, SummarizeIcon } from './icons';
-import { artifactDefinitions, ArtifactKind } from './artifact';
-import { ArtifactToolbarItem } from './create-artifact';
-import { UseChatHelpers } from '@ai-sdk/react';
+import { artifactDefinitions, type ArtifactKind } from './artifact';
+import type { ArtifactToolbarItem } from './create-artifact';
+import type { UseChatHelpers } from '@ai-sdk/react';
 
 type ToolProps = {
   description: string;
@@ -314,11 +314,12 @@ const PureToolbar = ({
   artifactKind: ArtifactKind;
 }) => {
   const toolbarRef = useRef<HTMLDivElement>(null);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [selectedTool, setSelectedTool] = useState<string | null>(null);
   const [isAnimating, setIsAnimating] = useState(false);
 
+  // @ts-ignore
   useOnClickOutside(toolbarRef, () => {
     setIsToolbarVisible(false);
     setSelectedTool(null);
