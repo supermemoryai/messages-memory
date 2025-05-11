@@ -1,0 +1,33 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Infinite Chat - Project Overview
+
+This project is an AI chatbot application built with Next.js and the AI SDK. It provides a sophisticated chat interface with various features including authentication, file uploads, AI model integration, and persistent data storage.
+
+## Key Technologies
+
+- **Next.js**: The application is built with Next.js App Router for server-side rendering and routing
+- **AI SDK**: Unified API for generating text and working with various LLM providers (xAI, OpenAI, etc.)
+- **Authentication**: Uses Auth.js (NextAuth) for authentication
+- **Database**: Uses Vercel Postgres/Neon (via Drizzle ORM) for data persistence
+- **File Storage**: Vercel Blob for storing uploaded files
+- **UI**: shadcn/ui with Tailwind CSS for styling
+
+## Main Application Structure
+
+- [app/](mdc:app) - Main application routes using Next.js App Router
+  - [(auth)/](mdc:app/(auth)/) - Authentication-related routes
+  - [(chat)/](mdc:app/(chat)/) - Chat functionality and API routes
+- [components/](mdc:components) - React components
+- [lib/](mdc:lib) - Utility functions, AI tools, and database configuration
+- [hooks/](mdc:hooks) - Custom React hooks
+- [public/](mdc:public) - Static assets
+- [artifacts/](mdc:artifacts) - Handlers for various types of artifacts (code, images, etc.)
+
+## Project Entry Points
+
+- [app/layout.tsx](mdc:app/layout.tsx) - Root layout component
+- [middleware.ts](mdc:middleware.ts) - Next.js middleware for authentication and routing

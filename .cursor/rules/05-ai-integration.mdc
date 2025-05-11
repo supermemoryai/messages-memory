@@ -1,0 +1,37 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# AI Integration and Artifacts
+
+This project integrates with AI models for chat functionality and handles various types of artifacts (code, images, sheets, text).
+
+## AI Integration
+
+- [lib/ai/](mdc:lib/ai) - AI-related utilities and configurations
+- [lib/ai/tools/](mdc:lib/ai/tools) - AI tools and functions that can be called by the AI
+- [app/(chat)/api/chat/route.ts](mdc:app/(chat)/api/chat/route.ts) - Chat API endpoint that interfaces with AI models
+
+## Artifacts
+
+Artifacts are rich content types that can be generated or displayed in the chat:
+
+- [artifacts/](mdc:artifacts) - Artifact handlers
+  - [artifacts/code/](mdc:artifacts/code) - Code artifact handlers
+  - [artifacts/image/](mdc:artifacts/image) - Image artifact handlers
+  - [artifacts/sheet/](mdc:artifacts/sheet) - Spreadsheet artifact handlers
+  - [artifacts/text/](mdc:artifacts/text) - Text artifact handlers
+
+## Components for Artifacts
+
+- [components/artifact.tsx](mdc:components/artifact.tsx) - Main artifact component
+- [components/code-editor.tsx](mdc:components/code-editor.tsx) - Code editing and display
+- [components/text-editor.tsx](mdc:components/text-editor.tsx) - Text editing and display
+- [components/sheet-editor.tsx](mdc:components/sheet-editor.tsx) - Spreadsheet editing and display
+- [components/image-editor.tsx](mdc:components/image-editor.tsx) - Image display
+
+## AI Model Configuration
+
+- Model selection is configurable (xAI Grok, OpenAI, etc.)
+- AI SDK is used to provide a unified interface for different LLM providers

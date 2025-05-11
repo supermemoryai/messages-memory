@@ -1,0 +1,35 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Database and Data Handling
+
+This project uses Drizzle ORM with Vercel Postgres/Neon for data storage and Vercel Blob for file storage.
+
+## Database Configuration
+
+- [lib/db/index.ts](mdc:lib/db/index.ts) - Database connection setup
+- [lib/db/schema.ts](mdc:lib/db/schema.ts) - Database schema definitions
+- [drizzle.config.ts](mdc:drizzle.config.ts) - Drizzle ORM configuration
+
+## Migrations
+
+- [lib/db/migrate.ts](mdc:lib/db/migrate.ts) - Database migration script
+- [lib/db/migrations/](mdc:lib/db/migrations) - Migration files
+
+## Data Models
+
+The database includes the following main tables:
+- Users - User accounts and authentication
+- Chats - Chat sessions
+- Messages - Individual messages in chats
+- Attachments - Files attached to messages
+
+## File Storage
+
+- [app/(chat)/api/files/upload/route.ts](mdc:app/(chat)/api/files/upload/route.ts) - File upload handler using Vercel Blob
+
+## Data Helpers
+
+- [lib/db/helpers/](mdc:lib/db/helpers) - Helper functions for database operations

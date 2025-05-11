@@ -1,0 +1,38 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Components Structure
+
+This project uses a combination of custom components and shadcn/ui components for the user interface.
+
+## Core Chat Components
+
+- [components/chat.tsx](mdc:components/chat.tsx) - Main chat interface component
+- [components/message.tsx](mdc:components/message.tsx) - Individual message component
+- [components/messages.tsx](mdc:components/messages.tsx) - Container for all messages
+- [components/chat-header.tsx](mdc:components/chat-header.tsx) - Header for the chat interface
+- [components/multimodal-input.tsx](mdc:components/multimodal-input.tsx) - Input component that handles text and file uploads
+
+## Sidebar Components
+
+- [components/app-sidebar.tsx](mdc:components/app-sidebar.tsx) - Main sidebar component
+- [components/sidebar-history.tsx](mdc:components/sidebar-history.tsx) - Chat history in sidebar
+- [components/sidebar-user-nav.tsx](mdc:components/sidebar-user-nav.tsx) - User navigation in sidebar
+
+## Artifact Components
+
+Artifacts are different types of content that can be displayed in the chat:
+
+- [components/artifact.tsx](mdc:components/artifact.tsx) - Base artifact component
+- [components/code-editor.tsx](mdc:components/code-editor.tsx) - Code editor artifact
+- [components/text-editor.tsx](mdc:components/text-editor.tsx) - Text editor artifact
+- [components/image-editor.tsx](mdc:components/image-editor.tsx) - Image editor artifact
+- [components/sheet-editor.tsx](mdc:components/sheet-editor.tsx) - Spreadsheet editor artifact
+
+## UI Components
+
+- [components/ui/](mdc:components/ui) - shadcn/ui components for building the interface
+- [components/markdown.tsx](mdc:components/markdown.tsx) - Markdown rendering component
+- [components/theme-provider.tsx](mdc:components/theme-provider.tsx) - Theme provider for light/dark mode

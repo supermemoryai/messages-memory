@@ -1,0 +1,35 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Next.js App Router Structure
+
+This project uses Next.js App Router for routing and server components. The main routes are organized in the `app` directory.
+
+## Authentication Routes
+
+- [app/(auth)/login](mdc:app/(auth)/login) - Login page
+- [app/(auth)/register](mdc:app/(auth)/register) - Registration page
+- [app/(auth)/api/auth/[...nextauth]](mdc:app/(auth)/api/auth/[...nextauth]) - NextAuth API routes
+
+## Chat Routes
+
+- [app/(chat)/page.tsx](mdc:app/(chat)/page.tsx) - Home page (chat listing)
+- [app/(chat)/chat/[id]](mdc:app/(chat)/chat/[id]) - Individual chat page
+
+## API Routes
+
+- [app/(chat)/api/chat](mdc:app/(chat)/api/chat) - Chat API endpoints
+- [app/(chat)/api/files/upload](mdc:app/(chat)/api/files/upload) - File upload API
+- [app/(chat)/api/history](mdc:app/(chat)/api/history) - Chat history API
+- [app/(chat)/api/vote](mdc:app/(chat)/api/vote) - Vote/feedback API
+
+## Route Protection
+
+- [middleware.ts](mdc:middleware.ts) - Handles authentication and redirects
+
+## Layout Structure
+
+- [app/layout.tsx](mdc:app/layout.tsx) - Root layout with providers
+- [app/(chat)/layout.tsx](mdc:app/(chat)/layout.tsx) - Chat layout with sidebar
