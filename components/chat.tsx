@@ -70,12 +70,14 @@ export function Chat({
     }),
     onFinish: (_, { usage }) => {
       mutate(unstable_serialize(getChatHistoryPaginationKey));
-      const totalTokens = usage.totalTokens || 0;
-      console.log('totalTokens in chat.tsx', totalTokens);
-      if (totalTokens > 10000) {
-        console.log('deleting oldest message in chat.tsx');
-        setMessages((messages) => messages.slice(2));
-      }
+
+      // Disabled message eviction for now
+      // const totalTokens = usage.totalTokens || 0;
+      // console.log('totalTokens in chat.tsx', totalTokens);
+      // if (totalTokens > 10000) {
+      //   console.log('deleting oldest message in chat.tsx');
+      //   setMessages((messages) => messages.slice(2));
+      // }
     },
     onError: (error) => {
       toast({

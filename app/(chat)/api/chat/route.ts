@@ -208,15 +208,16 @@ export async function POST(request: Request) {
                   ],
                 });
 
-                // Check token usage and delete oldest message if needed
-                const totalTokens = usage.totalTokens || 0;
-                console.log('totalTokens', totalTokens);
-                if (totalTokens > 10000) {
-                  console.log(
-                    `Token usage (${totalTokens}) exceeds limit. Deleting oldest message.`,
-                  );
-                  await deleteOldestMessageInChat({ chatId: id });
-                }
+                // Disabled message eviction for now
+                // // Check token usage and delete oldest message if needed
+                // const totalTokens = usage.totalTokens || 0;
+                // console.log('totalTokens', totalTokens);
+                // if (totalTokens > 10000) {
+                //   console.log(
+                //     `Token usage (${totalTokens}) exceeds limit. Deleting oldest message.`,
+                //   );
+                //   await deleteOldestMessageInChat({ chatId: id });
+                // }
               } catch (_) {
                 console.error('Failed to save chat');
               }
