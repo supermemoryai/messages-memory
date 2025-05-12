@@ -509,3 +509,36 @@ export async function getStreamIdsByChatId({ chatId }: { chatId: string }) {
     throw error;
   }
 }
+
+export async function deleteOldestMessageInChat({
+  chatId,
+}: { chatId: string }) {
+  try {
+    // Find the oldest message in the chat
+    const oldestMessage = await db
+      .select()
+      .from(message)
+      .where(eq(message.chatId, chatId))
+      .orderBy(asc(message.createdAt))
+      .limit(2);
+
+    if (oldestMessage.length === 0) {
+      return null;
+    }
+
+    const messageIds = oldestMessage.map((message) => message.id);
+
+    // Delete any votes associated with this message
+    await db
+      .delete(vote)
+      .where(and(eq(vote.chatId, chatId), inArray(vote.messageId, messageIds)));
+
+    // Delete the message
+    return await db
+      .delete(message)
+      .where(and(eq(message.chatId, chatId), inArray(message.id, messageIds)));
+  } catch (error) {
+    console.error('Failed to delete oldest message in chat', error);
+    throw error;
+  }
+}

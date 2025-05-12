@@ -68,8 +68,14 @@ export function Chat({
       selectedChatModel: initialChatModel,
       selectedVisibilityType: visibilityType,
     }),
-    onFinish: () => {
+    onFinish: (_, { usage }) => {
       mutate(unstable_serialize(getChatHistoryPaginationKey));
+      const totalTokens = usage.totalTokens || 0;
+      console.log('totalTokens in chat.tsx', totalTokens);
+      if (totalTokens > 10000) {
+        console.log('deleting oldest message in chat.tsx');
+        setMessages((messages) => messages.slice(2));
+      }
     },
     onError: (error) => {
       toast({

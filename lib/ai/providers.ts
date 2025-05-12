@@ -11,9 +11,6 @@ import {
   reasoningModel,
   titleModel,
 } from './models.test';
-import { createSupermemory } from 'supermemory-ai-provider';
-
-const supermemory = createSupermemory();
 
 export const myProvider = isTestEnvironment
   ? customProvider({
@@ -26,7 +23,7 @@ export const myProvider = isTestEnvironment
     })
   : customProvider({
       languageModels: {
-        'chat-model': supermemory.languageModel('gpt-4o-mini'),
+        'chat-model': xai('grok-2-vision-latest'),
         'chat-model-reasoning': wrapLanguageModel({
           model: xai('grok-3-mini-beta'),
           middleware: extractReasoningMiddleware({ tagName: 'think' }),

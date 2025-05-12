@@ -10,6 +10,7 @@ import { type RequestHints, systemPrompt } from '@/lib/ai/prompts';
 import {
   createStreamId,
   deleteChatById,
+  deleteOldestMessageInChat,
   getChatById,
   getMessageCountByUserId,
   getMessagesByChatId,
@@ -175,7 +176,7 @@ export async function POST(request: Request) {
               dataStream,
             }),
           },
-          onFinish: async ({ response }) => {
+          onFinish: async ({ response, usage }) => {
             if (session.user?.id) {
               try {
                 const assistantId = getTrailingMessageId({
@@ -206,6 +207,16 @@ export async function POST(request: Request) {
                     },
                   ],
                 });
+
+                // Check token usage and delete oldest message if needed
+                const totalTokens = usage.totalTokens || 0;
+                console.log('totalTokens', totalTokens);
+                if (totalTokens > 10000) {
+                  console.log(
+                    `Token usage (${totalTokens}) exceeds limit. Deleting oldest message.`,
+                  );
+                  await deleteOldestMessageInChat({ chatId: id });
+                }
               } catch (_) {
                 console.error('Failed to save chat');
               }
