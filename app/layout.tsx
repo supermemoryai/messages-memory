@@ -5,6 +5,7 @@ import { ThemeProvider } from '@/components/theme-provider';
 
 import './globals.css';
 import { SessionProvider } from 'next-auth/react';
+import { TooltipProvider } from '@/components/ui/tooltip';
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://supermemory.chat'),
@@ -78,7 +79,9 @@ export default async function RootLayout({
           disableTransitionOnChange
         >
           <Toaster position="top-center" />
-          <SessionProvider>{children}</SessionProvider>
+          <TooltipProvider>
+            <SessionProvider>{children}</SessionProvider>
+          </TooltipProvider>
         </ThemeProvider>
       </body>
     </html>

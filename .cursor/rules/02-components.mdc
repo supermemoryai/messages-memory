@@ -15,12 +15,6 @@ This project uses a combination of custom components and shadcn/ui components fo
 - [components/chat-header.tsx](mdc:components/chat-header.tsx) - Header for the chat interface
 - [components/multimodal-input.tsx](mdc:components/multimodal-input.tsx) - Input component that handles text and file uploads
 
-## Sidebar Components
-
-- [components/app-sidebar.tsx](mdc:components/app-sidebar.tsx) - Main sidebar component
-- [components/sidebar-history.tsx](mdc:components/sidebar-history.tsx) - Chat history in sidebar
-- [components/sidebar-user-nav.tsx](mdc:components/sidebar-user-nav.tsx) - User navigation in sidebar
-
 ## Artifact Components
 
 Artifacts are different types of content that can be displayed in the chat:
