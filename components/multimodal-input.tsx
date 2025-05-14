@@ -194,7 +194,7 @@ function PureMultimodalInput({
   }, [status, scrollToBottom]);
 
   return (
-    <div className="relative w-full flex flex-col gap-4">
+    <div className="relative w-full flex flex-col gap-2">
       <AnimatePresence>
         {!isAtBottom && (
           <motion.div
@@ -245,7 +245,15 @@ function PureMultimodalInput({
           className="flex flex-row gap-2 overflow-x-scroll items-end"
         >
           {attachments.map((attachment) => (
-            <PreviewAttachment key={attachment.url} attachment={attachment} />
+            <PreviewAttachment
+              key={attachment.url}
+              attachment={attachment}
+              onDelete={(attachment) => {
+                setAttachments((currentAttachments) =>
+                  currentAttachments.filter((a) => a.url !== attachment.url),
+                );
+              }}
+            />
           ))}
 
           {uploadQueue.map((filename) => (
@@ -268,6 +276,30 @@ function PureMultimodalInput({
         placeholder="Send a message..."
         value={input}
         onChange={handleInput}
+        onPaste={async (event) => {
+          const pastedText = event.clipboardData.getData('text');
+          if (pastedText.length > 2000) {
+            event.preventDefault();
+            const file = new File([pastedText], 'pasted.txt', {
+              type: 'text/plain',
+            });
+            setUploadQueue([file.name]);
+            try {
+              const attachment = await uploadFile(file);
+              if (attachment) {
+                setAttachments((currentAttachments) => [
+                  ...currentAttachments,
+                  attachment,
+                ]);
+              }
+            } catch (error) {
+              console.error('Error uploading pasted text as file:', error);
+              toast.error('Failed to upload pasted text as file');
+            } finally {
+              setUploadQueue([]);
+            }
+          }
+        }}
         className={cx(
           'min-h-[24px] max-h-[calc(75dvh)] overflow-hidden [field-sizing:normal] resize-none rounded-2xl !text-base bg-muted pb-10 dark:border-zinc-700 pt-4',
           className,

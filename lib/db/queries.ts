@@ -592,3 +592,14 @@ export async function deleteMessages({
     throw error;
   }
 }
+
+export async function deleteMessagesByChatId({ id }: { id: string }) {
+  try {
+    await db.delete(vote).where(eq(vote.chatId, id));
+    await db.delete(message).where(eq(message.chatId, id));
+    await db.delete(stream).where(eq(stream.chatId, id));
+  } catch (error) {
+    console.error('Failed to delete messages by chat id from database');
+    throw error;
+  }
+}

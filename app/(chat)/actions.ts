@@ -8,6 +8,7 @@ import {
   updateChatVisiblityById,
   deleteMessages,
   getMessagesByChatId,
+  deleteMessagesByChatId,
 } from '@/lib/db/queries';
 import type { VisibilityType } from '@/components/visibility-selector';
 import { myProvider } from '@/lib/ai/providers';
@@ -75,4 +76,8 @@ export async function deleteMessagePair({ id }: { id: string }) {
     messageIds: messagesToDelete,
     chatId: message.chatId,
   });
+}
+
+export async function clearChat({ id }: { id: string }) {
+  await deleteMessagesByChatId({ id });
 }

@@ -126,6 +126,15 @@ export function Chat({
   return (
     <>
       <div className="flex flex-col min-w-0 h-dvh bg-[url(/images/gradient.png)] bg-cover backdrop-blur-3xl">
+        <ChatHeader
+          chatId={id}
+          selectedModelId={initialChatModel}
+          selectedVisibilityType={initialVisibilityType}
+          isReadonly={isReadonly}
+          session={session}
+          setMessages={setMessages}
+        />
+
         <Messages
           chatId={id}
           status={status}
