@@ -6,6 +6,8 @@ import {
   deleteMessagesByChatIdAfterTimestamp,
   getMessageById,
   updateChatVisiblityById,
+  deleteMessages,
+  getMessagesByChatId,
 } from '@/lib/db/queries';
 import type { VisibilityType } from '@/components/visibility-selector';
 import { myProvider } from '@/lib/ai/providers';
@@ -50,4 +52,27 @@ export async function updateChatVisibility({
   visibility: VisibilityType;
 }) {
   await updateChatVisiblityById({ chatId, visibility });
+}
+
+export async function deleteMessagePair({ id }: { id: string }) {
+  const [message] = await getMessageById({ id });
+  const messages = await getMessagesByChatId({ id: message.chatId });
+
+  const messageIndex = messages.findIndex((m) => m.id === id);
+  if (messageIndex === -1) return;
+
+  const messagesToDelete = [message.id];
+
+  // If this is a user message and there's an assistant message after it, include it
+  if (message.role === 'user' && messageIndex < messages.length - 1) {
+    const nextMessage = messages[messageIndex + 1];
+    if (nextMessage.role === 'assistant') {
+      messagesToDelete.push(nextMessage.id);
+    }
+  }
+
+  await deleteMessages({
+    messageIds: messagesToDelete,
+    chatId: message.chatId,
+  });
 }

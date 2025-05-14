@@ -542,3 +542,26 @@ export async function deleteOldestMessageInChat({
     throw error;
   }
 }
+
+export async function deleteMessages({
+  messageIds,
+  chatId,
+}: {
+  messageIds: string[];
+  chatId: string;
+}) {
+  try {
+    // First delete any votes associated with these messages
+    await db
+      .delete(vote)
+      .where(and(eq(vote.chatId, chatId), inArray(vote.messageId, messageIds)));
+
+    // Then delete the messages
+    return await db
+      .delete(message)
+      .where(and(eq(message.chatId, chatId), inArray(message.id, messageIds)));
+  } catch (error) {
+    console.error('Failed to delete messages from database');
+    throw error;
+  }
+}

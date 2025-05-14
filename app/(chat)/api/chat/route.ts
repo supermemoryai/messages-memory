@@ -235,7 +235,8 @@ export async function POST(request: Request) {
           sendReasoning: true,
         });
       },
-      onError: () => {
+      onError: (e) => {
+        console.error(e);
         return 'Oops, an error occurred!';
       },
     });

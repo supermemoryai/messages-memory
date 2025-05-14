@@ -6,7 +6,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { memo, useState } from 'react';
 import type { Vote } from '@/lib/db/schema';
 import { DocumentToolCall, DocumentToolResult } from './document';
-import { PencilEditIcon, SparklesIcon } from './icons';
+import { PencilEditIcon, SparklesIcon, TrashIcon } from './icons';
 import { Markdown } from './markdown';
 import { MessageActions } from './message-actions';
 import { PreviewAttachment } from './preview-attachment';
@@ -19,6 +19,7 @@ import { MessageEditor } from './message-editor';
 import { DocumentPreview } from './document-preview';
 import { MessageReasoning } from './message-reasoning';
 import type { UseChatHelpers } from '@ai-sdk/react';
+import { deleteMessagePair } from '@/app/(chat)/actions';
 
 const PurePreviewMessage = ({
   chatId,
@@ -39,7 +40,8 @@ const PurePreviewMessage = ({
   isReadonly: boolean;
   requiresScrollPadding: boolean;
 }) => {
-  const [mode, setMode] = useState<'view' | 'edit'>('view');
+  const [mode, setMode] = useState<'view' | 'edit' | 'delete'>('view');
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
   return (
     <AnimatePresence>
@@ -54,8 +56,8 @@ const PurePreviewMessage = ({
           className={cn(
             'flex gap-4 w-full group-data-[role=user]/message:ml-auto group-data-[role=user]/message:max-w-2xl',
             {
-              'w-full': mode === 'edit',
-              'group-data-[role=user]/message:w-fit': mode !== 'edit',
+              'w-full': mode === 'edit' || mode === 'delete',
+              'group-data-[role=user]/message:w-fit': mode === 'view',
             },
           )}
         >
@@ -106,21 +108,39 @@ const PurePreviewMessage = ({
                   return (
                     <div key={key} className="flex flex-row gap-2 items-start">
                       {message.role === 'user' && !isReadonly && (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              data-testid="message-edit-button"
-                              variant="ghost"
-                              className="px-2 h-fit rounded-full text-muted-foreground opacity-0 group-hover/message:opacity-100"
-                              onClick={() => {
-                                setMode('edit');
-                              }}
-                            >
-                              <PencilEditIcon />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>Edit message</TooltipContent>
-                        </Tooltip>
+                        <div className="flex flex-row gap-1 pt-1">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                data-testid="message-delete-button"
+                                variant="ghost"
+                                className="px-2 h-fit rounded-full text-destructive opacity-0 group-hover/message:opacity-100"
+                                onClick={() => {
+                                  setMode('delete');
+                                }}
+                              >
+                                <TrashIcon />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Delete message</TooltipContent>
+                          </Tooltip>
+
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                data-testid="message-edit-button"
+                                variant="ghost"
+                                className="px-2 h-fit rounded-full text-muted-foreground opacity-0 group-hover/message:opacity-100"
+                                onClick={() => {
+                                  setMode('edit');
+                                }}
+                              >
+                                <PencilEditIcon />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Edit message</TooltipContent>
+                          </Tooltip>
+                        </div>
                       )}
 
                       <div
@@ -148,6 +168,109 @@ const PurePreviewMessage = ({
                         setMessages={setMessages}
                         reload={reload}
                       />
+                    </div>
+                  );
+                }
+
+                if (mode === 'delete') {
+                  return (
+                    <div key={key} className="flex flex-col gap-2 w-full">
+                      <div className="flex flex-row gap-2 items-start justify-end">
+                        {message.role === 'user' && !isReadonly && (
+                          <div className="flex flex-row gap-1 pt-1">
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  data-testid="message-delete-button"
+                                  variant="ghost"
+                                  className="px-2 h-fit rounded-full text-destructive opacity-0 group-hover/message:opacity-100"
+                                  onClick={() => {
+                                    setMode('delete');
+                                  }}
+                                >
+                                  <TrashIcon />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Delete message</TooltipContent>
+                            </Tooltip>
+
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  data-testid="message-edit-button"
+                                  variant="ghost"
+                                  className="px-2 h-fit rounded-full text-muted-foreground opacity-0 group-hover/message:opacity-100"
+                                  onClick={() => {
+                                    setMode('edit');
+                                  }}
+                                >
+                                  <PencilEditIcon />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Edit message</TooltipContent>
+                            </Tooltip>
+                          </div>
+                        )}
+
+                        <div
+                          data-testid="message-content"
+                          className={cn('flex flex-col gap-4', {
+                            'bg-primary text-primary-foreground px-3 py-2 rounded-xl':
+                              message.role === 'user',
+                          })}
+                        >
+                          <Markdown>{sanitizeText(part.text)}</Markdown>
+                        </div>
+                      </div>
+                      <div className="flex flex-row gap-2 justify-end">
+                        <Button
+                          variant="outline"
+                          className="h-fit py-2 px-3"
+                          onClick={() => {
+                            setMode('view');
+                          }}
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          data-testid="message-delete-confirm-button"
+                          variant="destructive"
+                          className="h-fit py-2 px-3"
+                          disabled={isSubmitting}
+                          onClick={async () => {
+                            setIsSubmitting(true);
+
+                            try {
+                              setMessages((messages) => {
+                                const index = messages.findIndex(
+                                  (m) => m.id === message.id,
+                                );
+                                if (index !== -1) {
+                                  // Remove this message and its corresponding assistant message
+                                  return messages.filter(
+                                    (_, i) => i !== index && i !== index + 1,
+                                  );
+                                }
+                                return messages;
+                              });
+
+                              setMode('view');
+
+                              await deleteMessagePair({
+                                id: message.id,
+                              });
+                            } catch (error) {
+                              console.error('Failed to delete message:', error);
+                              // Reset UI state even if deletion fails
+                              setMode('view');
+                            } finally {
+                              setIsSubmitting(false);
+                            }
+                          }}
+                        >
+                          {isSubmitting ? 'Deleting...' : 'Delete'}
+                        </Button>
+                      </div>
                     </div>
                   );
                 }
