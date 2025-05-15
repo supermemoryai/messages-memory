@@ -24,7 +24,7 @@ const supermemory = createOpenAICompatible({
   headers: {
     'x-api-key': process.env.SUPERMEMORY_API_KEY,
   },
-}).chatModel('gpt-4o-mini');
+}).chatModel('gpt-4o');
 
 export const myProvider = isTestEnvironment
   ? customProvider({
