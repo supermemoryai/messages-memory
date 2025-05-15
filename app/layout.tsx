@@ -9,7 +9,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://supermemory.chat'),
-  title: 'Supermemory Infinite Chat',
+  title: 'Supermemory Chat',
   description: 'Just ask.',
 };
 
