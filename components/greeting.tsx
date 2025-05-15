@@ -13,7 +13,15 @@ export const Greeting = () => {
         transition={{ delay: 0.5 }}
         className="text-2xl font-semibold"
       >
-        Hello there!
+        Chat forever, with{' '}
+        <a
+          href="https://supermemory.ai"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="font-extrabold"
+        >
+          Supermemory
+        </a>
       </motion.div>
       <motion.div
         initial={{ opacity: 0, y: 10 }}
@@ -22,7 +30,15 @@ export const Greeting = () => {
         transition={{ delay: 0.6 }}
         className="text-2xl text-zinc-500"
       >
-        How can I help you today?
+        Add it to your app{' '}
+        <a
+          href="https://docs.supermemory.ai/infinite-chat"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline underline-offset-4"
+        >
+          in one line
+        </a>
       </motion.div>
     </div>
   );

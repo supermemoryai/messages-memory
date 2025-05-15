@@ -75,7 +75,7 @@ function PureChatHeader({
           <AlertDialogTrigger asChild>
             <Button
               variant="ghost"
-              className="p-2 h-auto mr-auto bg-background"
+              className="p-2 m-1 h-auto mr-auto bg-background"
             >
               <TrashIcon />
             </Button>
