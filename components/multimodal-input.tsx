@@ -266,30 +266,30 @@ function PureMultimodalInput({
         placeholder="Send a message..."
         value={input}
         onChange={handleInput}
-        onPaste={async (event) => {
-          const pastedText = event.clipboardData.getData('text');
-          if (pastedText.length > 2000) {
-            event.preventDefault();
-            const file = new File([pastedText], 'pasted.txt', {
-              type: 'text/plain',
-            });
-            setUploadQueue([file.name]);
-            try {
-              const attachment = await uploadFile(file);
-              if (attachment) {
-                setAttachments((currentAttachments) => [
-                  ...currentAttachments,
-                  attachment,
-                ]);
-              }
-            } catch (error) {
-              console.error('Error uploading pasted text as file:', error);
-              toast.error('Failed to upload pasted text as file');
-            } finally {
-              setUploadQueue([]);
-            }
-          }
-        }}
+        // onPaste={async (event) => {
+        //   const pastedText = event.clipboardData.getData('text');
+        //   if (pastedText.length > 2000) {
+        //     event.preventDefault();
+        //     const file = new File([pastedText], 'pasted.txt', {
+        //       type: 'text/plain',
+        //     });
+        //     setUploadQueue([file.name]);
+        //     try {
+        //       const attachment = await uploadFile(file);
+        //       if (attachment) {
+        //         setAttachments((currentAttachments) => [
+        //           ...currentAttachments,
+        //           attachment,
+        //         ]);
+        //       }
+        //     } catch (error) {
+        //       console.error('Error uploading pasted text as file:', error);
+        //       toast.error('Failed to upload pasted text as file');
+        //     } finally {
+        //       setUploadQueue([]);
+        //     }
+        //   }
+        // }}
         className={cx(
           'min-h-[24px] max-h-[calc(75dvh)] overflow-hidden [field-sizing:normal] resize-none rounded-2xl !text-base bg-muted pb-10 dark:border-zinc-700 pt-4',
           className,
