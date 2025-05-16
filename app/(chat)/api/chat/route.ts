@@ -68,8 +68,8 @@ export async function POST(request: Request) {
   try {
     const json = await request.json();
     requestBody = postRequestBodySchema.parse(json);
-  } catch (_) {
-    return new ChatSDKError('bad_request:api').toResponse();
+  } catch (e) {
+    return new ChatSDKError('bad_request:api', String(e)).toResponse();
   }
 
   try {

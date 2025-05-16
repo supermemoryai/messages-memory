@@ -69,6 +69,12 @@ export class ChatSDKError extends Error {
       );
     }
 
+    console.error({
+      code,
+      message,
+      cause,
+    });
+
     return Response.json({ code, message, cause }, { status: statusCode });
   }
 }

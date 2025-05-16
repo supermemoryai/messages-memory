@@ -110,8 +110,6 @@ function PureMultimodalInput({
   const [uploadQueue, setUploadQueue] = useState<Array<string>>([]);
 
   const submitForm = useCallback(() => {
-    console.log(input);
-
     handleSubmit(undefined, {
       experimental_attachments: attachments,
     });
@@ -296,6 +294,7 @@ function PureMultimodalInput({
         )}
         rows={2}
         autoFocus
+        maxLength={1999}
         onKeyDown={(event) => {
           if (
             event.key === 'Enter' &&
