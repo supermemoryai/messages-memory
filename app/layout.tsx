@@ -6,6 +6,7 @@ import { ThemeProvider } from '@/components/theme-provider';
 import './globals.css';
 import { SessionProvider } from 'next-auth/react';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { Analytics } from '@vercel/analytics/react';
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://supermemory.chat'),
@@ -83,6 +84,7 @@ export default async function RootLayout({
             <SessionProvider>{children}</SessionProvider>
           </TooltipProvider>
         </ThemeProvider>
+        <Analytics />
       </body>
     </html>
   );
