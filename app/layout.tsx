@@ -6,7 +6,7 @@ import { ThemeProvider } from '@/components/theme-provider';
 import './globals.css';
 import { SessionProvider } from 'next-auth/react';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import { Analytics } from '@vercel/analytics/react';
+import { Analytics } from '@vercel/analytics/next';
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://supermemory.chat'),
