@@ -10,7 +10,6 @@ import { type RequestHints, systemPrompt } from '@/lib/ai/prompts';
 import {
   createStreamId,
   deleteChatById,
-  deleteOldestMessageInChat,
   getChatById,
   getMessageCountByUserId,
   getMessagesByChatId,
@@ -148,7 +147,7 @@ export async function POST(request: Request) {
     const stream = createDataStream({
       execute: (dataStream) => {
         const result = streamText({
-          model: myProvider.languageModel(selectedChatModel),
+          model: myProvider(session.user.id).languageModel(selectedChatModel),
           system: systemPrompt({ selectedChatModel, requestHints }),
           messages,
           maxSteps: 5,
