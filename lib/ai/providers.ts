@@ -23,7 +23,7 @@ const supermemory = (user?: string) => {
   }
 
   return createOpenAICompatible({
-    baseURL: 'https://api.supermemory.ai/v3/https://api.openai.com/v1/',
+    baseURL: 'https://api.openai.com/v1/',
     name: 'supermemory',
     apiKey: process.env.OPENAI_API_KEY,
     headers: {
