@@ -95,9 +95,11 @@ export async function POST(request: Request) {
     const chat = await getChatById({ id });
 
     if (!chat) {
-      const title = await generateTitleFromUserMessage({
-        message,
-      });
+      // const title = await generateTitleFromUserMessage({
+      //   message,
+      // }, session.user.id);
+
+      const title = "";
 
       await saveChat({
         id,

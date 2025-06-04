@@ -22,9 +22,9 @@ export async function generateTitleFromUserMessage({
   message,
 }: {
   message: UIMessage;
-}) {
+}, user: string) {
   const { text: title } = await generateText({
-    model: myProvider().languageModel('title-model'),
+    model: myProvider(user).languageModel('title-model'),
     system: `\n
     - you will generate a short title based on the first message a user begins a conversation with
     - ensure it is not more than 80 characters long
