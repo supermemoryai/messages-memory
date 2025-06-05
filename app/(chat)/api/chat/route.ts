@@ -137,11 +137,13 @@ export async function POST(request: Request) {
 
     if (!chat) {
       console.log('[POST] Chat not found, creating new chat');
-      const title = await generateTitleFromUserMessage({
-        message,
-        userId: session.user.id,
-      });
-      console.log('[POST] Generated title:', title);
+      // const title = await generateTitleFromUserMessage({
+      //   message,
+      //   userId: session.user.id,
+      // });
+      // console.log('[POST] Generated title:', title);
+
+      const title = '';
 
       await saveChat({
         id,
