@@ -1,19 +1,41 @@
-import { put } from '@vercel/blob';
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import { nanoid } from 'nanoid';
 
 import { auth } from '@/app/(auth)/auth';
+
+// Configure R2 client
+const r2 = new S3Client({
+  region: 'auto',
+  endpoint: process.env.CLOUDFLARE_R2_ENDPOINT,
+  credentials: {
+    accessKeyId: process.env.CLOUDFLARE_R2_ACCESS_KEY_ID!,
+    secretAccessKey: process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY!,
+  },
+});
 
 // Use Blob instead of File since File is not available in Node.js environment
 const FileSchema = z.object({
   file: z
     .instanceof(Blob)
-    .refine((file) => file.size <= 5 * 1024 * 1024, {
-      message: 'File size should be less than 5MB',
+    .refine((file) => file.size <= 10 * 1024 * 1024, {
+      message: 'File size should be less than 10MB',
     })
-    // Update the file type based on the kind of files you want to accept
-    .refine((file) => ['image/jpeg', 'image/png'].includes(file.type), {
-      message: 'File type should be JPEG or PNG',
+    .refine((file) => {
+      const allowedTypes = [
+        'image/jpeg',
+        'image/png',
+        'image/gif',
+        'image/webp',
+        'text/plain',
+        'application/pdf',
+        'text/csv',
+        'application/json',
+      ];
+      return allowedTypes.includes(file.type);
+    }, {
+      message: 'File type not supported',
     }),
 });
 
@@ -47,16 +69,29 @@ export async function POST(request: Request) {
     }
 
     // Get filename from formData since Blob doesn't have name property
-    const filename = (formData.get('file') as File).name;
+    const originalFilename = (formData.get('file') as File).name;
+    const fileExtension = originalFilename.split('.').pop();
+    const filename = `${nanoid()}.${fileExtension}`;
     const fileBuffer = await file.arrayBuffer();
 
     try {
-      const data = await put(`${filename}`, fileBuffer, {
-        access: 'public',
-        addRandomSuffix: true,
+      const command = new PutObjectCommand({
+        Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME!,
+        Key: filename,
+        Body: new Uint8Array(fileBuffer),
+        ContentType: file.type,
       });
 
-      return NextResponse.json(data);
+      await r2.send(command);
+
+      // Construct the public URL
+      const url = `${process.env.CLOUDFLARE_R2_PUBLIC_URL}/${filename}`;
+
+      return NextResponse.json({
+        url,
+        pathname: filename,
+        contentType: file.type,
+      });
     } catch (error) {
       return NextResponse.json(
         { error: `Upload failed: ${error}` },

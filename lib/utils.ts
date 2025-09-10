@@ -22,6 +22,7 @@ export const fetcher = async (url: string) => {
 export async function fetchWithErrorHandlers(
   input: RequestInfo | URL,
   init?: RequestInit,
+  preconnect = false,
 ) {
   try {
     const response = await fetch(input, init);

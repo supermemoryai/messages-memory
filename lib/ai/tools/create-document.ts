@@ -1,7 +1,7 @@
 import { generateUUID } from '@/lib/utils';
-import { DataStreamWriter, tool } from 'ai';
+import { type DataStreamWriter, tool } from 'ai';
 import { z } from 'zod';
-import { Session } from 'next-auth';
+import type { Session } from 'next-auth';
 import {
   artifactKinds,
   documentHandlersByArtifactKind,
@@ -21,51 +21,81 @@ export const createDocument = ({ session, dataStream }: CreateDocumentProps) =>
       kind: z.enum(artifactKinds),
     }),
     execute: async ({ title, kind }) => {
-      const id = generateUUID();
+      try {
+        console.log(
+          `[CreateDocumentTool] Starting execution - title: ${title}, kind: ${kind}`,
+        );
+        console.log(`[CreateDocumentTool] Session details:`, {
+          userId: session?.user?.id,
+          userEmail: session?.user?.email,
+        });
 
-      dataStream.writeData({
-        type: 'kind',
-        content: kind,
-      });
+        const id = generateUUID();
+        console.log(`[CreateDocumentTool] Generated document ID: ${id}`);
 
-      dataStream.writeData({
-        type: 'id',
-        content: id,
-      });
+        dataStream.writeData({
+          type: 'kind',
+          content: kind,
+        });
 
-      dataStream.writeData({
-        type: 'title',
-        content: title,
-      });
+        dataStream.writeData({
+          type: 'id',
+          content: id,
+        });
 
-      dataStream.writeData({
-        type: 'clear',
-        content: '',
-      });
+        dataStream.writeData({
+          type: 'title',
+          content: title,
+        });
 
-      const documentHandler = documentHandlersByArtifactKind.find(
-        (documentHandlerByArtifactKind) =>
-          documentHandlerByArtifactKind.kind === kind,
-      );
+        dataStream.writeData({
+          type: 'clear',
+          content: '',
+        });
 
-      if (!documentHandler) {
-        throw new Error(`No document handler found for kind: ${kind}`);
+        const documentHandler = documentHandlersByArtifactKind.find(
+          (documentHandlerByArtifactKind) =>
+            documentHandlerByArtifactKind.kind === kind,
+        );
+
+        if (!documentHandler) {
+          console.error(
+            `[CreateDocumentTool] No document handler found for kind: ${kind}`,
+          );
+          console.error(
+            `[CreateDocumentTool] Available handlers:`,
+            documentHandlersByArtifactKind.map((h) => h.kind),
+          );
+          throw new Error(`No document handler found for kind: ${kind}`);
+        }
+
+        console.log(`[CreateDocumentTool] Found handler for kind: ${kind}`);
+
+        await documentHandler.onCreateDocument({
+          id,
+          title,
+          dataStream,
+          session,
+        });
+
+        dataStream.writeData({ type: 'finish', content: '' });
+
+        console.log(
+          `[CreateDocumentTool] Document creation completed successfully`,
+        );
+
+        return {
+          id,
+          title,
+          kind,
+          content: 'A document was created and is now visible to the user.',
+        };
+      } catch (error) {
+        console.error(
+          `[CreateDocumentTool] Fatal error during document creation:`,
+          error,
+        );
+        throw error;
       }
-
-      await documentHandler.onCreateDocument({
-        id,
-        title,
-        dataStream,
-        session,
-      });
-
-      dataStream.writeData({ type: 'finish', content: '' });
-
-      return {
-        id,
-        title,
-        kind,
-        content: 'A document was created and is now visible to the user.',
-      };
     },
   });

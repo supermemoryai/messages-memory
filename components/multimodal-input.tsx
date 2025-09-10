@@ -20,7 +20,6 @@ import { ArrowUpIcon, PaperclipIcon, StopIcon } from './icons';
 import { PreviewAttachment } from './preview-attachment';
 import { Button } from './ui/button';
 import { Textarea } from './ui/textarea';
-import { SuggestedActions } from './suggested-actions';
 import equal from 'fast-deep-equal';
 import type { UseChatHelpers } from '@ai-sdk/react';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -264,32 +263,70 @@ function PureMultimodalInput({
         placeholder="Send a message..."
         value={input}
         onChange={handleInput}
-        // onPaste={async (event) => {
-        //   const pastedText = event.clipboardData.getData('text');
-        //   if (pastedText.length > 2000) {
-        //     event.preventDefault();
-        //     const file = new File([pastedText], 'pasted.txt', {
-        //       type: 'text/plain',
-        //     });
-        //     setUploadQueue([file.name]);
-        //     try {
-        //       const attachment = await uploadFile(file);
-        //       if (attachment) {
-        //         setAttachments((currentAttachments) => [
-        //           ...currentAttachments,
-        //           attachment,
-        //         ]);
-        //       }
-        //     } catch (error) {
-        //       console.error('Error uploading pasted text as file:', error);
-        //       toast.error('Failed to upload pasted text as file');
-        //     } finally {
-        //       setUploadQueue([]);
-        //     }
-        //   }
-        // }}
+        onPaste={async (event) => {
+          const clipboardData = event.clipboardData;
+          if (!clipboardData) return;
+
+          // Check for files first (images, etc.)
+          const files = Array.from(clipboardData.files);
+          if (files.length > 0) {
+            event.preventDefault();
+
+            // Add files to upload queue
+            setUploadQueue(files.map((file) => file.name));
+
+            try {
+              const uploadPromises = files.map((file) => uploadFile(file));
+              const uploadedAttachments = await Promise.all(uploadPromises);
+              const successfullyUploadedAttachments =
+                uploadedAttachments.filter(
+                  (attachment) => attachment !== undefined,
+                );
+
+              setAttachments((currentAttachments) => [
+                ...currentAttachments,
+                ...successfullyUploadedAttachments,
+              ]);
+
+              toast.success(
+                `Added ${successfullyUploadedAttachments.length} file(s) from paste`,
+              );
+            } catch (error) {
+              console.error('Error uploading pasted files:', error);
+              toast.error('Failed to upload pasted files');
+            } finally {
+              setUploadQueue([]);
+            }
+            return;
+          }
+
+          // Handle long text as file
+          const pastedText = clipboardData.getData('text');
+          if (pastedText.length > 2000) {
+            event.preventDefault();
+            const file = new File([pastedText], 'pasted.txt', {
+              type: 'text/plain',
+            });
+            setUploadQueue([file.name]);
+            try {
+              const attachment = await uploadFile(file);
+              if (attachment) {
+                setAttachments((currentAttachments) => [
+                  ...currentAttachments,
+                  attachment,
+                ]);
+                toast.success('Long text added as file attachment');
+              }
+            } catch (error) {
+              console.error('Error uploading pasted text as file:', error);
+              toast.error('Failed to upload pasted text as file');
+            } finally {
+              setUploadQueue([]);
+            }
+          }
+        }}
         className={cx(
-          'min-h-[24px] max-h-[calc(75dvh)] overflow-hidden [field-sizing:normal] resize-none rounded-2xl !text-base bg-muted pb-10 dark:border-zinc-700 pt-4',
+          'min-h-[24px] max-h-[calc(75dvh)] overflow-hidden [field-sizing:normal] resize-none rounded-2xl !text-base bg-muted border border-border pb-10 pt-4',
           className,
         )}
         rows={2}
@@ -303,7 +340,7 @@ function PureMultimodalInput({
           ) {
             event.preventDefault();
 
-            if (status !== 'ready') {
+            if (status === 'streaming' || status === 'submitted') {
               toast.error('Please wait for the model to finish its response!');
             } else {
               submitForm();
@@ -354,7 +391,7 @@ function PureAttachmentsButton({
   return (
     <Button
       data-testid="attachments-button"
-      className="rounded-md rounded-bl-lg p-[7px] h-fit dark:border-zinc-700 hover:dark:bg-zinc-900 hover:bg-zinc-200"
+      className="rounded-md rounded-bl-lg p-[7px] h-fit border-border hover:bg-accent"
       onClick={(event) => {
         event.preventDefault();
         fileInputRef.current?.click();
@@ -379,7 +416,7 @@ function PureStopButton({
   return (
     <Button
       data-testid="stop-button"
-      className="rounded-full p-1.5 h-fit border dark:border-zinc-600"
+      className="rounded-full p-1.5 h-fit border border-border bg-card"
       onClick={(event) => {
         event.preventDefault();
         stop();
@@ -405,7 +442,7 @@ function PureSendButton({
   return (
     <Button
       data-testid="send-button"
-      className="rounded-full p-1.5 h-fit border dark:border-zinc-600"
+      className="rounded-full p-1.5 h-fit border border-border bg-primary text-primary-foreground hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground"
       onClick={(event) => {
         event.preventDefault();
         submitForm();

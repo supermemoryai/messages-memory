@@ -1,8 +1,4 @@
-import {
-  customProvider,
-  extractReasoningMiddleware,
-  wrapLanguageModel,
-} from 'ai';
+import { customProvider } from 'ai';
 import { xai } from '@ai-sdk/xai';
 import { isTestEnvironment } from '../constants';
 import {
@@ -11,7 +7,7 @@ import {
   reasoningModel,
   titleModel,
 } from './models.test';
-import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
+import { createAnthropic } from '@ai-sdk/anthropic';
 
 if (!process.env.SUPERMEMORY_API_KEY) {
   throw new Error('SUPERMEMORY_API_KEY is not set');
@@ -19,20 +15,27 @@ if (!process.env.SUPERMEMORY_API_KEY) {
 
 const supermemory = (user?: string) => {
   if (!user) {
+    console.error('[Provider] User is required for supermemory provider');
     throw new Error('User is required');
   }
 
-  return createOpenAICompatible({
-    baseURL: 'https://api.openai.com/v1/',
-    name: 'supermemory',
-    apiKey: process.env.OPENAI_API_KEY,
+  if (!process.env.ANTHROPIC_API_KEY) {
+    console.error('[Provider] ANTHROPIC_API_KEY is missing');
+    throw new Error('ANTHROPIC_API_KEY is not configured');
+  }
+
+  console.log(`[Provider] Creating supermemory provider for user: ${user}`);
+
+  return createAnthropic({
+    baseURL:
+      'https://api.supermemory.ai/v3/https://api.anthropic.com/v1?userId=' +
+      user,
+    apiKey: process.env.ANTHROPIC_API_KEY,
     headers: {
       // @ts-ignore
-      'x-api-key': process.env.SUPERMEMORY_API_KEY,
+      'x-supermemory-api-key': process.env.SUPERMEMORY_API_KEY,
     },
-  }).chatModel('gpt-4o', {
-    user: user,
-  });
+  }).languageModel('claude-3-5-sonnet-latest');
 };
 
 export const myProvider = isTestEnvironment
@@ -45,19 +48,39 @@ export const myProvider = isTestEnvironment
           'artifact-model': artifactModel,
         },
       })
-  : (user?: string) =>
-      customProvider({
+  : (user?: string) => {
+      console.log(
+        `[Provider] Creating production provider for user: ${user || 'unknown'}`,
+      );
+
+      const provider = customProvider({
         languageModels: {
           // 'chat-model': xai('grok-2-vision-latest'),
           'chat-model': supermemory(user),
-          'chat-model-reasoning': wrapLanguageModel({
-            model: xai('grok-3-mini-beta'),
-            middleware: extractReasoningMiddleware({ tagName: 'think' }),
-          }),
-          'title-model': xai('grok-2-1212'),
-          'artifact-model': xai('grok-2-1212'),
+          'chat-model-reasoning': supermemory(user),
+          'title-model': supermemory(user),
+          'artifact-model': (() => {
+            console.log(
+              `[Provider] Creating XAI grok-2-1212 model for artifacts`,
+            );
+            console.log(
+              `[Provider] XAI_API_KEY available: ${!!process.env.XAI_API_KEY}`,
+            );
+            if (!process.env.XAI_API_KEY) {
+              console.error(
+                '[Provider] XAI_API_KEY is missing, falling back to supermemory',
+              );
+              return supermemory(user);
+            }
+            return xai('grok-2-1212');
+          })(),
         },
         imageModels: {
-          'small-model': xai.image('grok-2-image'),
+          // @ts-ignore
+          'small-model': supermemory(user),
         },
       });
+
+      console.log(`[Provider] Provider created successfully`);
+      return provider;
+    };

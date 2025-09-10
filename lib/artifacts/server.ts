@@ -44,24 +44,38 @@ export function createDocumentHandler<T extends ArtifactKind>(config: {
   return {
     kind: config.kind,
     onCreateDocument: async (args: CreateDocumentCallbackProps) => {
-      const draftContent = await config.onCreateDocument({
-        id: args.id,
-        title: args.title,
-        dataStream: args.dataStream,
-        session: args.session,
-      });
-
-      if (args.session?.user?.id) {
-        await saveDocument({
+      try {
+        console.log(`[CreateDocument] Starting creation for kind: ${config.kind}, title: ${args.title}`);
+        console.log(`[CreateDocument] Session user ID: ${args.session?.user?.id}`);
+        
+        const draftContent = await config.onCreateDocument({
           id: args.id,
           title: args.title,
-          content: draftContent,
-          kind: config.kind,
-          userId: args.session.user.id,
+          dataStream: args.dataStream,
+          session: args.session,
         });
-      }
 
-      return;
+        console.log(`[CreateDocument] Generated content length: ${draftContent?.length || 0}`);
+
+        if (args.session?.user?.id) {
+          console.log(`[CreateDocument] Saving document to database...`);
+          await saveDocument({
+            id: args.id,
+            title: args.title,
+            content: draftContent,
+            kind: config.kind,
+            userId: args.session.user.id,
+          });
+          console.log(`[CreateDocument] Document saved successfully`);
+        } else {
+          console.error(`[CreateDocument] No user ID in session, cannot save document`);
+        }
+
+        return;
+      } catch (error) {
+        console.error(`[CreateDocument] Error in ${config.kind} document creation:`, error);
+        throw error;
+      }
     },
     onUpdateDocument: async (args: UpdateDocumentCallbackProps) => {
       const draftContent = await config.onUpdateDocument({
