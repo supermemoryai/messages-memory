@@ -30,6 +30,8 @@ import {
   ThumbsUp,
   ThumbsDown,
   ChevronDown,
+  ChevronRight,
+  ChevronLeft,
   Sparkles,
   CheckCircle,
   Globe,
@@ -47,6 +49,12 @@ import {
   Download,
   LineChart,
   AlertTriangle,
+  Smile,
+  Search,
+  Bell,
+  BellOff,
+  Pin,
+  PinOff,
 } from 'lucide-react';
 
 export const BotIcon = () => {
@@ -437,3 +445,65 @@ export const LineChartIcon = ({ size = 16 }: { size?: number }) => (
 export const WarningIcon = ({ size = 16 }: { size?: number }) => (
   <AlertTriangle size={size} />
 );
+
+// Icons object for compatibility with messages/ components
+type IconProps = React.HTMLAttributes<SVGElement> & {
+  size?: number;
+  strokeWidth?: number;
+};
+
+export const Icons = {
+  arrowUp: ({ size = 16, strokeWidth = 2, ...props }: IconProps) => (
+    <ArrowUp
+      className="text-muted-foreground"
+      size={size}
+      strokeWidth={strokeWidth}
+      {...props}
+    />
+  ),
+  smile: ({ size = 16, ...props }: IconProps) => (
+    <Smile className="text-muted-foreground" size={size} {...props} />
+  ),
+  search: ({ size = 16, ...props }: IconProps) => (
+    <Search className="text-muted-foreground" size={size} {...props} />
+  ),
+  close: ({ size = 16, ...props }: IconProps) => (
+    <X className="text-muted-foreground" size={size} {...props} />
+  ),
+  bell: ({ size = 16, ...props }: IconProps) => (
+    <Bell className="text-muted-foreground" size={size} {...props} />
+  ),
+  bellOff: ({ size = 16, ...props }: IconProps) => (
+    <BellOff className="text-muted-foreground" size={size} {...props} />
+  ),
+  pin: ({ size = 16, ...props }: IconProps) => (
+    <Pin className="text-muted-foreground" size={size} {...props} />
+  ),
+  pinOff: ({ size = 16, ...props }: IconProps) => (
+    <PinOff className="text-muted-foreground" size={size} {...props} />
+  ),
+  trash: ({ size = 16, ...props }: IconProps) => (
+    <Trash2 className="text-muted-foreground" size={size} {...props} />
+  ),
+  chevronRight: ({ size = 16, ...props }: IconProps) => (
+    <ChevronRight className="text-muted-foreground" size={size} {...props} />
+  ),
+  chevronLeft: ({ size = 16, ...props }: IconProps) => (
+    <ChevronLeft className="text-muted-foreground" size={size} {...props} />
+  ),
+  back: ({ size = 16, ...props }: IconProps) => (
+    <ChevronLeft className="text-muted-foreground" size={size} {...props} />
+  ),
+  spinner: ({ size = 16, ...props }: IconProps) => (
+    <Loader2 className="text-muted-foreground animate-spin" size={size} {...props} />
+  ),
+  plus: ({ size = 16, ...props }: IconProps) => (
+    <Plus className="text-muted-foreground" size={size} {...props} />
+  ),
+  paperclip: ({ size = 16, ...props }: IconProps) => (
+    <Paperclip className="text-muted-foreground" size={size} {...props} />
+  ),
+  image: ({ size = 16, ...props }: IconProps) => (
+    <ImageLucide className="text-muted-foreground" size={size} {...props} />
+  ),
+};

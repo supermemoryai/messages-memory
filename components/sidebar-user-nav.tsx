@@ -5,6 +5,7 @@ import Image from 'next/image';
 import type { User } from 'next-auth';
 import { signOut, useSession } from 'next-auth/react';
 import { useTheme } from 'next-themes';
+import { Logo } from './logo';
 
 import {
   DropdownMenu,
@@ -52,13 +53,9 @@ export function SidebarUserNav({ user }: { user: User }) {
                 data-testid="user-nav-button"
                 className="data-[state=open]:bg-sidebar-accent bg-background data-[state=open]:text-sidebar-accent-foreground h-10"
               >
-                <Image
-                  src={`https://avatar.vercel.sh/${user.email}`}
-                  alt={user.email ?? 'User Avatar'}
-                  width={24}
-                  height={24}
-                  className="rounded-full"
-                />
+                <div className="w-6 h-6 rounded-full bg-gradient-to-b from-[#9BA1AA] to-[#7D828A] flex items-center justify-center p-1 flex-shrink-0">
+                  <Logo className="w-full h-full text-white" />
+                </div>
                 <span data-testid="user-email" className="truncate">
                   {isGuest ? 'Guest' : user?.email}
                 </span>
