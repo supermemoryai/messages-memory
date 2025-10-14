@@ -1,7 +1,6 @@
 'use client';
 
 import type { User } from 'next-auth';
-import { useRouter } from 'next/navigation';
 
 import { SidebarHistory } from '@/components/sidebar-history';
 import { SidebarUserNav } from '@/components/sidebar-user-nav';

@@ -1,10 +1,10 @@
 import { Icons } from "./icons";
-import { Conversation } from "../types";
+import type { Conversation } from "../types";
 import { Logo } from "./logo";
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { initialContacts } from "../data/initial-contacts";
 import { useToast } from "@/hooks/use-toast";
-import { cn, generateUUID } from "@/lib/utils";
+import { cn, } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { getUserContacts, addUserContact } from "@/lib/contacts";
 import { ContactDrawer } from "./contact-drawer";
@@ -210,7 +210,6 @@ function RecipientSearch({
                     handlePersonSelect(person);
                   }}
                   onMouseEnter={() => setSelectedIndex(index)}
-                  tabIndex={0}
                 >
                   <div className="flex flex-col">
                     <span
@@ -457,7 +456,7 @@ export function ConversationHeader({
       setIsEditMode(true);
       const recipients =
         activeConversation?.recipients.map((r) => r.name).join(",") || "";
-      setRecipientInput(recipients + ",");
+      setRecipientInput(`${recipients},`);
     } 
     // Desktop: clicking header in new chat compact mode enters edit mode
     else if (isNewChat && showCompactNewChat && !isMobileView) {
@@ -495,7 +494,7 @@ export function ConversationHeader({
           .concat(person.name)
           .join(",")
       : person.name;
-    setRecipientInput(newValue + ",");
+    setRecipientInput(`${newValue},`);
     setSearchValue("");
     setShowResults(!hasReachedMaxRecipients(newValue));
     setSelectedIndex(-1);
@@ -544,7 +543,7 @@ export function ConversationHeader({
       const recipients = recipientInput.split(",").filter((r) => r.trim());
       if (recipients.length > 0) {
         const newRecipients = recipients.slice(0, -1).join(",");
-        setRecipientInput(newRecipients + ",");
+        setRecipientInput(`${newRecipients},`);
       }
       return;
     }
@@ -625,7 +624,7 @@ export function ConversationHeader({
   useEffect(() => {
     if (isEditMode && activeConversation?.recipients) {
       setRecipientInput(
-        activeConversation.recipients.map((r) => r.name).join(",") + ","
+        `${activeConversation.recipients.map((r) => r.name).join(",")},`
       );
     }
   }, [isEditMode, activeConversation]);
@@ -655,7 +654,7 @@ export function ConversationHeader({
             .filter((r) => r.trim())
             .filter((_, i) => i !== index)
             .join(",");
-          setRecipientInput(newRecipients + ",");
+          setRecipientInput(`${newRecipients},`);
           
           // Only update recipients if we're not in edit mode
           if (!isEditMode && onUpdateRecipients) {
@@ -789,8 +788,8 @@ export function ConversationHeader({
             )}
           </div>
           
-          {/* Mobile Clear Chat Button */}
-          {!isNewChat && activeConversation && (
+          {/* Mobile Clear Chat Button - only show for Supermemory chat */}
+          {!isNewChat && activeConversation && activeConversation.recipients.some(r => r.id === 'supermemory-ai') && (
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -868,8 +867,8 @@ export function ConversationHeader({
             )}
           </div>
           
-          {/* Desktop Clear Chat Button */}
-          {!isNewChat && activeConversation && (
+          {/* Desktop Clear Chat Button - only show for Supermemory chat */}
+          {!isNewChat && activeConversation && activeConversation.recipients.some(r => r.id === 'supermemory-ai') && (
             <button
               onClick={(e) => {
                 e.stopPropagation();

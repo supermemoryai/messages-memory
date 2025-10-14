@@ -1,4 +1,4 @@
-import { Conversation, Message } from "../types";
+import type { Conversation, Message } from "../types";
 
 // Represents a task in the message queue
 type MessageTask = {

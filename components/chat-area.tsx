@@ -1,9 +1,8 @@
 "use client";
 
-import { Conversation, Reaction, ReactionType, Attachment } from "../types";
+import type { Conversation, Reaction, ReactionType, Attachment } from "../types";
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
-import { ChevronLeft, Info, Paperclip } from "lucide-react";
 import { TypingBubble } from "./typing-bubble";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { Icons } from "./icons";
@@ -11,6 +10,7 @@ import Image from "next/image";
 import { useTheme } from "next-themes";
 import { MessageInput } from "./message-input";
 import { ConversationHeader } from "./conversation-header";
+import { Markdown } from "./markdown";
 
 interface ChatAreaProps {
   isNewChat: boolean;
@@ -29,6 +29,7 @@ interface ChatAreaProps {
   onMessageDraftChange?: (conversationId: string, message: string) => void;
   unreadCount?: number;
   onClearChat?: () => void;
+  isReadOnly?: boolean;
 }
 
 export function ChatArea({
@@ -48,6 +49,7 @@ export function ChatArea({
   onMessageDraftChange,
   unreadCount = 0,
   onClearChat,
+  isReadOnly = false,
 }: ChatAreaProps) {
   const [inputValue, setInputValue] = useState(messageDraft);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -133,6 +135,13 @@ export function ChatArea({
   useEffect(() => {
     setInputValue(messageDraft);
   }, [messageDraft]);
+
+  // Reset input state when switching to/from read-only chats
+  useEffect(() => {
+    if (isReadOnly) {
+      setInputValue("");
+    }
+  }, [isReadOnly, conversationId]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -272,7 +281,20 @@ export function ChatArea({
                             )
                           )}
                         >
-                          {message.content}
+                          <div className={cn(
+                            "prose prose-sm max-w-none",
+                            isMe ? "prose-invert" : "dark:prose-invert",
+                            "[&_p]:my-0 [&_p]:leading-[22px]",
+                            "[&_h1]:text-xl [&_h1]:mt-2 [&_h1]:mb-1",
+                            "[&_h2]:text-lg [&_h2]:mt-2 [&_h2]:mb-1",
+                            "[&_h3]:text-base [&_h3]:mt-2 [&_h3]:mb-1",
+                            "[&_ul]:my-1 [&_ol]:my-1",
+                            "[&_li]:my-0",
+                            "[&_code]:text-sm [&_code]:rounded [&_code]:px-1",
+                            isMe ? "[&_a]:text-white [&_a]:underline" : "[&_a]:text-blue-500"
+                          )}>
+                            <Markdown>{message.content}</Markdown>
+                          </div>
                         </button>
                       </PopoverTrigger>
 
@@ -399,19 +421,21 @@ export function ChatArea({
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input - iMessage style with TipTap */}
-      <div className="absolute bottom-0 left-0 right-0 z-50 mb-[env(keyboard-inset-height,0px)]">
-        <MessageInput
-          message={inputValue}
-          setMessage={handleInputChange}
-          handleSend={handleSend}
-          disabled={false}
-          recipients={activeConversation?.recipients || []}
-          isMobileView={isMobileView ?? false}
-          conversationId={conversationId ?? undefined}
-          isNewChat={isNewChat}
-        />
-      </div>
+      {/* Input - iMessage style with TipTap - hide for read-only chats */}
+      {!isReadOnly && (
+        <div className="absolute bottom-0 left-0 right-0 z-50 mb-[env(keyboard-inset-height,0px)]">
+          <MessageInput
+            message={inputValue}
+            setMessage={handleInputChange}
+            handleSend={handleSend}
+            disabled={false}
+            recipients={activeConversation?.recipients || []}
+            isMobileView={isMobileView ?? false}
+            conversationId={conversationId ?? undefined}
+            isNewChat={isNewChat}
+          />
+        </div>
+      )}
     </div>
   );
 }

@@ -8,6 +8,22 @@ const components: Partial<Components> = {
   // @ts-expect-error
   code: CodeBlock,
   pre: ({ children }) => <>{children}</>,
+  p: ({ node, children, ...props }) => {
+    // Check if the paragraph contains only inline content
+    // If it contains block elements like pre/code blocks, return a fragment
+    const hasBlockElement = React.Children.toArray(children).some(
+      (child) => 
+        React.isValidElement(child) && 
+        typeof child.type !== 'string' && 
+        (child.type === CodeBlock || child.props?.className?.includes('not-prose'))
+    );
+    
+    if (hasBlockElement) {
+      return <>{children}</>;
+    }
+    
+    return <p {...props}>{children}</p>;
+  },
   ol: ({ node, children, ...props }) => {
     return (
       <ol className="list-decimal list-outside ml-4" {...props}>

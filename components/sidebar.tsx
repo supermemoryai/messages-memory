@@ -1,21 +1,13 @@
 "use client";
 
-import { ReactNode, useState, useEffect } from "react";
-import { Conversation } from "../types";
+import { type ReactNode, useState, useEffect } from "react";
+import type { Conversation } from "../types";
 import { cn } from "@/lib/utils";
 import { SearchBar } from "./search-bar";
 import { ConversationItem } from "./conversation-item";
 import { ScrollArea } from "./ui/scroll-area";
 import { format, isToday, isYesterday, isThisWeek, parseISO } from "date-fns";
-import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuTrigger,
-} from "./ui/context-menu";
-import { Icons } from "./icons";
 import { useTheme } from "next-themes";
-import Image from "next/image";
 
 interface SidebarProps {
   children: ReactNode;

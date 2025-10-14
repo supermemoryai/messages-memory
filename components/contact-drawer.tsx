@@ -13,7 +13,7 @@ import {
 import { Icons } from "./icons";
 import { Switch } from "@/components/ui/switch";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Recipient } from "@/types";
+import type { Recipient } from "@/types";
 import { Fragment } from "react";
 
 interface ContactDrawerProps {

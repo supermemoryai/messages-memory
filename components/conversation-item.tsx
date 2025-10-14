@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useSwipeable } from "react-swipeable";
-import { Conversation } from "../types";
+import type { Conversation } from "../types";
 import { SwipeActions } from "./swipe-actions";
 import {
   ContextMenu,
@@ -200,7 +200,7 @@ export function ConversationItem({
                           ? "bg-blue-100"
                           : "bg-gray-500 dark:bg-gray-300"
                       } rounded-full`}
-                    ></div>
+                    />
                     <div
                       style={{ animation: "blink 1.4s infinite linear 0.2s" }}
                       className={`w-1 h-1 ${
@@ -208,7 +208,7 @@ export function ConversationItem({
                           ? "bg-blue-100"
                           : "bg-gray-500 dark:bg-gray-300"
                       } rounded-full`}
-                    ></div>
+                    />
                     <div
                       style={{ animation: "blink 1.4s infinite linear 0.4s" }}
                       className={`w-1 h-1 ${
@@ -216,7 +216,7 @@ export function ConversationItem({
                           ? "bg-blue-100"
                           : "bg-gray-500 dark:bg-gray-300"
                       } rounded-full`}
-                    ></div>
+                    />
                   </div>
                 </div>
               </div>

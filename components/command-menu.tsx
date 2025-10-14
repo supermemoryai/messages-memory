@@ -1,7 +1,7 @@
 "use client";
 
 import { forwardRef, useImperativeHandle, useState } from "react";
-import { Conversation } from "../types";
+import type { Conversation } from "../types";
 import {
   CommandDialog,
   CommandEmpty,
@@ -28,21 +28,20 @@ export interface CommandMenuRef {
   setOpen: (open: boolean) => void;
 }
 
-export const CommandMenu = forwardRef<CommandMenuRef, CommandMenuProps>(
-  (
-    {
-      conversations,
-      activeConversation,
-      onNewChat,
-      onSelectConversation,
-      onDeleteConversation,
-      onUpdateConversation,
-      onOpenChange,
-      soundEnabled,
-      onSoundToggle,
-    },
-    ref
-  ) => {
+export const CommandMenu = forwardRef<CommandMenuRef, CommandMenuProps>(function CommandMenu(
+  {
+    conversations,
+    activeConversation,
+    onNewChat,
+    onSelectConversation,
+    onDeleteConversation,
+    onUpdateConversation,
+    onOpenChange,
+    soundEnabled,
+    onSoundToggle,
+  },
+  ref
+) {
     const [open, setOpen] = useState(false);
 
     useImperativeHandle(ref, () => ({

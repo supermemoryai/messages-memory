@@ -4,8 +4,8 @@ class SoundEffectPlayer {
   private receivedSound: HTMLAudioElement | null = null;
   private unreadSound: HTMLAudioElement | null = null;
   private reactionSound: HTMLAudioElement | null = null;
-  private enabled: boolean = true;
-  private isMobile: boolean = false;
+  private enabled = true;
+  private isMobile = false;
 
   private constructor() {
     if (typeof window !== 'undefined') {
