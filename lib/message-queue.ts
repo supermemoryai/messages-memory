@@ -115,6 +115,19 @@ export class MessageQueue {
       // If content is empty (file-only message), use a placeholder
       const messageContent = lastUserMessage.content.trim() || "📎 File attachment";
 
+      const parts = [
+        {
+          type: "text" as const,
+          text: messageContent,
+        },
+        ...(lastUserMessage.attachments || []).map(attachment => ({
+          type: "file" as const,
+          url: attachment.url,
+          name: attachment.name,
+          mediaType: attachment.contentType,
+        })),
+      ];
+
       const requestBody = {
         id: chatId,
         message: {
@@ -122,13 +135,7 @@ export class MessageQueue {
           createdAt: new Date(),
           role: "user" as const,
           content: messageContent,
-          parts: [
-            {
-              type: "text" as const,
-              text: messageContent,
-            },
-          ],
-          experimental_attachments: lastUserMessage.attachments || [],
+          parts,
         },
         selectedChatModel: "chat-model" as const,
         selectedVisibilityType: "private" as const,
@@ -182,6 +189,22 @@ export class MessageQueue {
             } catch (e) {
               // Ignore parse errors for partial chunks
             }
+          } else if (line.startsWith('3:')) {
+            // This is an error message
+            try {
+              const jsonStr = line.slice(2).trim();
+              if (jsonStr) {
+                const parsed = JSON.parse(jsonStr);
+                if (parsed && typeof parsed === 'string') {
+                  throw new Error(`Stream error: ${parsed}`);
+                }
+              }
+            } catch (e) {
+              if (e instanceof Error && e.message.startsWith('Stream error:')) {
+                throw e;
+              }
+              // Ignore parse errors for partial chunks
+            }
           }
         }
       }
@@ -189,7 +212,7 @@ export class MessageQueue {
       // Create final message with accumulated text
       const newMessage: Message = {
         id: newMessageId,
-        content: accumulatedText || "I'm here to help! Could you please rephrase your question?",
+        content: accumulatedText,
         sender: "Supermemory",
         timestamp: new Date().toISOString(),
       };

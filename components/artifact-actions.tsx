@@ -47,7 +47,7 @@ function PureArtifactActions({
 
   return (
     <div className="flex flex-row gap-1">
-      {artifactDefinition.actions.map((action) => (
+      {artifactDefinition.actions.map((action: any) => (
         <Tooltip key={action.description}>
           <TooltipTrigger asChild>
             <Button

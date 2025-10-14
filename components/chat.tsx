@@ -45,31 +45,34 @@ export function Chat({
     initialVisibilityType,
   });
 
+  const [input, setInput] = useState('');
+
   const {
     messages,
     setMessages,
     handleSubmit,
-    input,
     setInput,
     append,
     status,
     stop,
     reload,
     experimental_resume,
-    data,
+    data
   } = useChat({
     id,
     initialMessages,
+    api: '/api/chat', // Explicitly set the API endpoint
     experimental_throttle: 100,
-    sendExtraMessageFields: true,
     generateId: generateUUID,
     fetch: fetchWithErrorHandlers,
+
     experimental_prepareRequestBody: (body) => ({
       id,
       message: body.messages.at(-1),
       selectedChatModel: initialChatModel,
       selectedVisibilityType: visibilityType,
     }),
+
     onFinish: (_, { usage }) => {
       mutate(unstable_serialize(getChatHistoryPaginationKey));
 
@@ -81,6 +84,7 @@ export function Chat({
       //   setMessages((messages) => messages.slice(2));
       // }
     },
+
     onError: (error) => {
       if (error instanceof ChatSDKError) {
         toast({
@@ -88,7 +92,7 @@ export function Chat({
           description: error.message,
         });
       }
-    },
+    }
   });
 
   const searchParams = useSearchParams();

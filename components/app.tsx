@@ -4,9 +4,9 @@ import { Sidebar } from "./sidebar";
 import { ChatArea } from "./chat-area";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Nav } from "./nav";
-import { Conversation, Message, Reaction, Attachment } from "../types";
+import type { Conversation, Message, Reaction, Attachment } from "../types";
 import { generateUUID } from "@/lib/utils";
-import { initialConversations, SUPERMEMORY_CHAT_ID } from "../data/initial-conversations";
+import { initialConversations, SUPERMEMORY_CHAT_ID, PROFILE_CHAT_ID } from "../data/initial-conversations";
 import { MessageQueue } from "../lib/message-queue";
 import { useToast } from "@/hooks/use-toast";
 import { CommandMenu } from "./command-menu";
@@ -61,7 +61,7 @@ export default function App() {
 
       // If conversation is not found, handle gracefully
       if (!selectedConversation) {
-        console.error(`Conversation with ID ${conversationId} not found`);
+        console.warn(`Conversation with ID ${conversationId} not found`);
 
         // Clear URL and select first available conversation
         window.history.pushState({}, "", "/");
@@ -117,6 +117,120 @@ export default function App() {
     }
   }, [conversations]);
 
+  // Fetch and update user profile for the profile chat
+  const updateProfileChat = useCallback(async () => {
+    try {
+      const response = await fetch('/api/profile');
+      if (response.ok) {
+        const { profile } = await response.json();
+        
+        // Format profile as a readable message
+        let profileContent = `# Your Supermemory Profile\n\n`;
+        profileContent += `This is the profile that AI models use to personalize responses when you chat.\n\n`;
+        profileContent += `**User ID:** \`${profile.userId}\`\n`;
+        if (profile.name) profileContent += `**Name:** ${profile.name}\n`;
+        if (profile.email) profileContent += `**Email:** ${profile.email}\n\n`;
+        
+        profileContent += `---\n\n`;
+        
+        // Add summary/context if available
+        if (profile.summary || profile.context) {
+          profileContent += `## Profile Summary\n\n`;
+          profileContent += `${profile.summary || profile.context}\n\n`;
+        }
+        
+        // Add facts if available
+        if (profile.facts && profile.facts.length > 0) {
+          profileContent += `## Facts About You\n\n`;
+          profile.facts.forEach((fact: string) => {
+            profileContent += `- ${fact}\n`;
+          });
+          profileContent += `\n`;
+        }
+        
+        // Add preferences if available
+        if (profile.preferences && profile.preferences.length > 0) {
+          profileContent += `## Your Preferences\n\n`;
+          profile.preferences.forEach((pref: string) => {
+            profileContent += `- ${pref}\n`;
+          });
+          profileContent += `\n`;
+        }
+        
+        // Add recent memories if available
+        if (profile.memories && profile.memories.length > 0) {
+          profileContent += `## Recent Memories\n\n`;
+          profile.memories.slice(0, 10).forEach((memory: any) => {
+            if (memory.content) {
+              profileContent += `- ${memory.content.substring(0, 200)}${memory.content.length > 200 ? '...' : ''}\n`;
+            }
+          });
+          profileContent += `\n`;
+        }
+        
+        // If no data available
+        if (!profile.summary && !profile.context && !profile.facts?.length && !profile.preferences?.length && !profile.memories?.length) {
+          profileContent += `## No Profile Data Yet\n\n`;
+          profileContent += `Your profile is empty. Start chatting with Supermemory to build your personalized profile!\n\n`;
+          profileContent += `The AI will learn about:\n`;
+          profileContent += `- Your preferences and interests\n`;
+          profileContent += `- Your background and skills\n`;
+          profileContent += `- Your projects and work\n`;
+          profileContent += `- Important facts about you\n\n`;
+          profileContent += `This profile is automatically used to personalize all AI responses.`;
+        } else {
+          profileContent += `---\n\n`;
+          profileContent += `*This profile is automatically injected into AI conversations via the [Supermemory AI SDK](https://supermemory.ai/docs/ai-sdk/user-profiles) for personalized responses.*`;
+        }
+        
+        // Update the profile chat with the new profile content
+        setConversations((prev) =>
+          prev.map((conv) => {
+            if (conv.id === PROFILE_CHAT_ID) {
+              return {
+                ...conv,
+                messages: [
+                  {
+                    id: 'profile-question',
+                    content: 'who am i',
+                    sender: 'You',
+                    timestamp: new Date(Date.now() - 60000).toISOString(),
+                  },
+                  {
+                    id: 'profile-response',
+                    content: profileContent,
+                    sender: 'Profile',
+                    timestamp: new Date().toISOString(),
+                  },
+                ],
+                lastMessageTime: new Date().toISOString(),
+              };
+            }
+            return conv;
+          })
+        );
+      }
+    } catch (error) {
+      console.error('Error fetching profile:', error);
+    }
+  }, []);
+
+  // Fetch profile every time profile chat becomes active
+  // Track if we just switched to the profile chat
+  const [lastProfileChatView, setLastProfileChatView] = useState<number>(0);
+  
+  useEffect(() => {
+    if (activeConversation === PROFILE_CHAT_ID) {
+      // Always fetch when switching to profile chat
+      updateProfileChat();
+      setLastProfileChatView(Date.now());
+      
+      // Auto-refresh every 30 seconds while viewing profile
+      const interval = setInterval(updateProfileChat, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [activeConversation, updateProfileChat]);
+
   // Set mobile view
   useEffect(() => {
     const handleResize = () => {
@@ -126,7 +240,19 @@ export default function App() {
 
         // When transitioning from mobile to desktop, restore the last active conversation
         if (!newIsMobileView && !activeConversation && lastActiveConversation) {
-          selectConversation(lastActiveConversation);
+          // Verify that the lastActiveConversation still exists before selecting it
+          const conversationExists = conversations.some(
+            (c) => c.id === lastActiveConversation
+          );
+          if (conversationExists) {
+            selectConversation(lastActiveConversation);
+          } else {
+            // If the conversation no longer exists, clear it and select the first available one
+            setLastActiveConversation(null);
+            if (conversations.length > 0) {
+              selectConversation(conversations[0].id);
+            }
+          }
         }
       }
     };
@@ -140,6 +266,7 @@ export default function App() {
     activeConversation,
     lastActiveConversation,
     selectConversation,
+    conversations,
   ]);
 
   // Get conversations from local storage
@@ -493,6 +620,11 @@ export default function App() {
       return;
     }
 
+    // Clear lastActiveConversation if we're deleting it
+    if (id === lastActiveConversation) {
+      setLastActiveConversation(null);
+    }
+
     setConversations((prevConversations) => {
       const newConversations = prevConversations.filter(
         (conv) => conv.id !== id
@@ -749,11 +881,12 @@ export default function App() {
               onClearChat={handleClearChat}
               messageDraft={
                 isNewConversation
-                  ? messageDrafts["new"] || ""
+                  ? messageDrafts.new || ""
                   : messageDrafts[activeConversation || ""] || ""
               }
               onMessageDraftChange={handleMessageDraftChange}
               unreadCount={totalUnreadCount}
+              isReadOnly={activeConversation === PROFILE_CHAT_ID}
             />
           </div>
         </div>

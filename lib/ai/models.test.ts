@@ -1,8 +1,8 @@
 import { simulateReadableStream } from 'ai';
-import { MockLanguageModelV1 } from 'ai/test';
+import { MockLanguageModelV2 } from 'ai/test';
 import { getResponseChunksByPrompt } from '@/tests/prompts/utils';
 
-export const chatModel = new MockLanguageModelV1({
+export const chatModel = new MockLanguageModelV2({
   doGenerate: async () => ({
     rawCall: { rawPrompt: null, rawSettings: {} },
     finishReason: 'stop',
@@ -19,11 +19,11 @@ export const chatModel = new MockLanguageModelV1({
   }),
 });
 
-export const reasoningModel = new MockLanguageModelV1({
+export const reasoningModel = new MockLanguageModelV2({
   doGenerate: async () => ({
     rawCall: { rawPrompt: null, rawSettings: {} },
     finishReason: 'stop',
-    usage: { promptTokens: 10, completionTokens: 20 },
+    usage: { inputTokens: 10, outputTokens: 20 },
     text: `Hello, world!`,
   }),
   doStream: async ({ prompt }) => ({
@@ -36,11 +36,11 @@ export const reasoningModel = new MockLanguageModelV1({
   }),
 });
 
-export const titleModel = new MockLanguageModelV1({
+export const titleModel = new MockLanguageModelV2({
   doGenerate: async () => ({
     rawCall: { rawPrompt: null, rawSettings: {} },
     finishReason: 'stop',
-    usage: { promptTokens: 10, completionTokens: 20 },
+    usage: { inputTokens: 10, outputTokens: 20 },
     text: `This is a test title`,
   }),
   doStream: async () => ({
@@ -61,11 +61,11 @@ export const titleModel = new MockLanguageModelV1({
   }),
 });
 
-export const artifactModel = new MockLanguageModelV1({
+export const artifactModel = new MockLanguageModelV2({
   doGenerate: async () => ({
     rawCall: { rawPrompt: null, rawSettings: {} },
     finishReason: 'stop',
-    usage: { promptTokens: 10, completionTokens: 20 },
+    usage: { inputTokens: 10, outputTokens: 20 },
     text: `Hello, world!`,
   }),
   doStream: async ({ prompt }) => ({

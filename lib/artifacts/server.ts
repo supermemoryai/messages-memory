@@ -3,7 +3,7 @@ import { imageDocumentHandler } from '@/artifacts/image/server';
 import { sheetDocumentHandler } from '@/artifacts/sheet/server';
 import { textDocumentHandler } from '@/artifacts/text/server';
 import type { ArtifactKind } from '@/components/artifact';
-import type { DataStreamWriter } from 'ai';
+import type { UIMessageStreamWriter } from 'ai';
 import type { Document } from '../db/schema';
 import { saveDocument } from '../db/queries';
 import type { Session } from 'next-auth';
@@ -19,14 +19,14 @@ export interface SaveDocumentProps {
 export interface CreateDocumentCallbackProps {
   id: string;
   title: string;
-  dataStream: DataStreamWriter;
+  dataStream: UIMessageStreamWriter;
   session: Session;
 }
 
 export interface UpdateDocumentCallbackProps {
   document: Document;
   description: string;
-  dataStream: DataStreamWriter;
+  dataStream: UIMessageStreamWriter;
   session: Session;
 }
 

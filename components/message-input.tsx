@@ -1,4 +1,4 @@
-import { Recipient, Attachment } from "../types";
+import type { Recipient, Attachment } from "../types";
 import {
   useState,
   useRef,
@@ -6,7 +6,7 @@ import {
   forwardRef,
   useImperativeHandle,
   useCallback,
-  ChangeEvent,
+  type ChangeEvent,
 } from "react";
 import data from "@emoji-mart/data";
 import Picker from "@emoji-mart/react";
@@ -15,7 +15,7 @@ import { useTheme } from "next-themes";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Mention from "@tiptap/extension-mention";
-import { SuggestionProps } from "@tiptap/suggestion";
+import type { SuggestionProps } from "@tiptap/suggestion";
 import Placeholder from "@tiptap/extension-placeholder";
 import { soundEffects } from "@/lib/sound-effects";
 import Image from "next/image";
@@ -63,10 +63,11 @@ export const MessageInput = forwardRef<
 
   // Tiptap editor definition
   const editor = useEditor({
+    editable: !disabled,
     extensions: [
       StarterKit,
       Placeholder.configure({
-        placeholder: "Type a message...",
+        placeholder: disabled ? "This chat is read-only" : "Type a message...",
       }),
       Mention.configure({
         HTMLAttributes: {
@@ -174,20 +175,22 @@ export const MessageInput = forwardRef<
     content: message,
     autofocus: !isMobileView && !isNewChat ? "end" : false,
     onUpdate: ({ editor }) => {
-      const element = editor.view.dom as HTMLElement;
-      const height = Math.min(200, Math.max(32, element.scrollHeight));
-      const containerHeight = height + 32; // Add padding (16px top + 16px bottom)
-      document.documentElement.style.setProperty(
-        "--dynamic-height",
-        `${containerHeight}px`
-      );
+      if (editor.view?.dom) {
+        const element = editor.view.dom as HTMLElement;
+        const height = Math.min(200, Math.max(32, element.scrollHeight));
+        const containerHeight = height + 32; // Add padding (16px top + 16px bottom)
+        document.documentElement.style.setProperty(
+          "--dynamic-height",
+          `${containerHeight}px`
+        );
+      }
       setMessage(editor.getHTML());
     },
     onCreate: ({ editor }) => {
-      if (!isMobileView && !isNewChat && editor.view) {
+      if (!isMobileView && !isNewChat && editor.view && editor.view.dom) {
         // Delay focus slightly to ensure view is ready
         setTimeout(() => {
-          if (editor.view) {
+          if (editor.view?.dom) {
             editor.commands.focus("end");
           }
         }, 0);
@@ -210,7 +213,7 @@ export const MessageInput = forwardRef<
         if (event.key === "Enter" && !event.shiftKey) {
           event.preventDefault();
           handleSubmit();
-          if (isMobileView) {
+          if (isMobileView && view.dom) {
             view.dom.blur();
           }
           return true;
@@ -278,11 +281,16 @@ export const MessageInput = forwardRef<
   );
 
   const handleSubmit = () => {
+    // Don't send if input is disabled (e.g., read-only chat)
+    if (disabled) {
+      return;
+    }
+    
     if (attachments.length > 0) {
       // Send attachments with a placeholder message
       const currentMessage = message.trim();
       setMessage("");
-      if (editor) {
+      if (editor && !editor.isDestroyed) {
         editor.commands.clearContent();
       }
       handleSend(attachments);
@@ -300,7 +308,7 @@ export const MessageInput = forwardRef<
     () => ({
       focus: () => {
         // Focus editor at end of content
-        if (editor && editor.view) {
+        if (editor && !editor.isDestroyed && editor.view && editor.view.dom) {
           editor.commands.focus("end");
         }
       },
@@ -311,27 +319,33 @@ export const MessageInput = forwardRef<
   // Effects
   // Update editor content when message changes
   useEffect(() => {
-    if (editor && message !== editor.getHTML()) {
+    if (editor && !editor.isDestroyed && message !== editor.getHTML()) {
       editor.commands.setContent(message);
     }
   }, [message, editor, isMobileView, disabled, conversationId]);
 
-  // Destroy editor when switching to new chat
+  // Update editor editable state when disabled prop changes
   useEffect(() => {
-    const isNewChat = conversationId === undefined;
-    const shouldDestroyEditor = editor && !isNewChat;
-
-    if (shouldDestroyEditor) {
-      editor.destroy();
+    if (editor && !editor.isDestroyed) {
+      editor.setEditable(!disabled);
     }
-  }, [conversationId]);
+  }, [disabled, editor]);
+
+  // Cleanup editor on component unmount
+  useEffect(() => {
+    return () => {
+      if (editor && !editor.isDestroyed) {
+        editor.destroy();
+      }
+    };
+  }, [editor]);
 
   // Focus editor at end of content
   useEffect(() => {
-    if (editor && editor.view && conversationId && !isMobileView && !isNewChat) {
+    if (editor && !editor.isDestroyed && editor.view && editor.view.dom && conversationId && !isMobileView && !isNewChat) {
       // Use a small timeout to ensure the view is fully mounted
       const timer = setTimeout(() => {
-        if (editor.view) {
+        if (editor && !editor.isDestroyed && editor.view && editor.view.dom) {
           editor.commands.focus("end");
         }
       }, 0);
@@ -342,7 +356,7 @@ export const MessageInput = forwardRef<
   // Update editor height for multi-line messages
   useEffect(() => {
     const updateHeight = () => {
-      if (editor) {
+      if (editor && !editor.isDestroyed && editor.view && editor.view.dom) {
         const element = editor.view.dom as HTMLElement;
         // Force reflow to get accurate scrollHeight
         element.style.height = "auto";
@@ -362,25 +376,33 @@ export const MessageInput = forwardRef<
       }
     };
 
+    // Only set up listeners if editor view is available
+    if (!editor || editor.isDestroyed || !editor.view) {
+      return;
+    }
+
     // Update height on editor changes
-    editor?.on("update", updateHeight);
+    editor.on("update", updateHeight);
 
     // Update height on window resize
     window.addEventListener("resize", updateHeight);
 
-    // Initial height calculation
-    updateHeight();
+    // Initial height calculation with small delay to ensure view is mounted
+    const timer = setTimeout(updateHeight, 0);
 
     return () => {
+      clearTimeout(timer);
       window.removeEventListener("resize", updateHeight);
-      editor?.off("update", updateHeight);
+      if (editor && !editor.isDestroyed) {
+        editor.off("update", updateHeight);
+      }
     };
   }, [editor, isMobileView]);
 
   // Reset editor height when message is cleared (e.g. after sending)
   useEffect(() => {
-    if (message === "") {
-      const element = editor?.view.dom as HTMLElement;
+    if (message === "" && editor && !editor.isDestroyed && editor.view && editor.view.dom) {
+      const element = editor.view.dom as HTMLElement;
       if (element) {
         element.style.height = "32px";
         document.documentElement.style.setProperty("--dynamic-height", "64px");
@@ -405,7 +427,7 @@ export const MessageInput = forwardRef<
       if (event.key === "Escape") {
         if (showEmojiPicker) {
           setShowEmojiPicker(false);
-        } else if (editor) {
+        } else if (editor && !editor.isDestroyed) {
           editor.commands.blur();
         }
       }
@@ -525,7 +547,7 @@ export const MessageInput = forwardRef<
             <Picker
               data={data}
               onEmojiSelect={(emoji: { native: string }) => {
-                if (editor) {
+                if (editor && !editor.isDestroyed) {
                   editor.commands.insertContent(emoji.native);
                 }
                 setShowEmojiPicker(false);

@@ -1,39 +1,32 @@
 import type { ArtifactKind } from '@/components/artifact';
 import type { Geo } from '@vercel/functions';
 
-export const artifactsPrompt = `
-Artifacts is a special user interface mode that helps users with writing, editing, and other content creation tasks. When artifact is open, it is on the right side of the screen, while the conversation is on the left side. When creating or updating documents, changes are reflected in real-time on the artifacts and visible to the user.
+export const toolsPrompt = `
+You have access to two powerful tools:
 
-When asked to write code, always use artifacts. When writing code, specify the language in the backticks, e.g. \`\`\`python\`code here\`\`\`. The default language is Python. Other languages are not yet supported, so let the user know if they request a different language.
+1. **supermemorySearch**: Search the user's personal memories, documents, and past conversations
+   - Use this when the user asks about their preferences, past discussions, saved information, or personal context
+   - This tool searches through everything the user has saved or discussed before
+   - Examples: "What did I say about...", "Remember when...", "My preferences for..."
 
-DO NOT UPDATE DOCUMENTS IMMEDIATELY AFTER CREATING THEM. WAIT FOR USER FEEDBACK OR REQUEST TO UPDATE IT.
+2. **exaSearch**: Search the web for current information
+   - Use this for factual questions, current events, news, or general knowledge
+   - This tool searches the internet for up-to-date information
+   - Examples: "What's the weather...", "Latest news about...", "How to..."
 
-This is a guide for using artifacts tools: \`createDocument\` and \`updateDocument\`, which render content on a artifacts beside the conversation.
-
-**When to use \`createDocument\`:**
-- For substantial content (>10 lines) or code
-- For content users will likely save/reuse (emails, code, essays, etc.)
-- When explicitly requested to create a document
-- For when content contains a single code snippet
-
-**When NOT to use \`createDocument\`:**
-- For informational/explanatory content
-- For conversational responses
-- When asked to keep it in chat
-
-**Using \`updateDocument\`:**
-- Default to full document rewrites for major changes
-- Use targeted updates only for specific, isolated changes
-- Follow user instructions for which parts to modify
-
-**When NOT to use \`updateDocument\`:**
-- Immediately after creating a document
-
-Do not update document right after creating it. Wait for user feedback or request to update it.
+**Important guidelines:**
+- Use tools when you need additional context beyond what's in the current conversation
+- Don't use tools for simple conversational responses
+- You can use both tools in the same response if needed
+- If a query could benefit from both personal context AND web search, use both tools
 `;
 
-export const regularPrompt =
-  'You are a friendly assistant! Keep your responses concise and helpful.';
+export const regularPrompt = `You are a friendly assistant! Keep your responses concise and helpful.
+
+You can process and analyze images, PDFs, and text files that users upload. When users share files:
+- For images: describe what you see, answer questions about the image, or perform analysis as requested
+- For PDFs and text files: read and analyze the content, answer questions, or summarize as needed
+- You have full access to the file contents, so provide detailed and helpful responses about them`;
 
 export interface RequestHints {
   latitude: Geo['latitude'];
@@ -62,7 +55,7 @@ export const systemPrompt = ({
   if (selectedChatModel === 'chat-model-reasoning') {
     return `${regularPrompt}\n\n${requestPrompt}`;
   } else {
-    return `${regularPrompt}\n\n${requestPrompt}\n\n${artifactsPrompt}`;
+    return `${regularPrompt}\n\n${requestPrompt}\n\n${toolsPrompt}`;
   }
 };
 

@@ -10,7 +10,7 @@ import {
 } from '../schema';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import { inArray } from 'drizzle-orm';
-import { appendResponseMessages, type UIMessage } from 'ai';
+import { type UIMessage } from 'ai';
 
 config({
   path: '.env.local',
@@ -88,7 +88,7 @@ function sanitizeParts<T extends { type: string; [k: string]: any }>(
   parts: T[],
 ): T[] {
   return parts.filter(
-    (part) => !(part.type === 'reasoning' && part.reasoning === 'undefined'),
+    (part) => !(part.type === 'reasoning' && part.reasoningText === 'undefined'),
   );
 }
 
@@ -155,14 +155,13 @@ async function migrateMessages() {
         const [firstAssistantMessage] = assistantMessages;
 
         try {
-          const uiSection = appendResponseMessages({
-            messages: [userMessage],
-            // @ts-expect-error: message.content has different type
-            responseMessages: assistantMessages,
-            _internal: {
-              currentDate: () => firstAssistantMessage.createdAt ?? new Date(),
-            },
-          });
+          const uiSection: UIMessage[] = [
+            userMessage as UIMessage,
+            ...assistantMessages.map(msg => ({
+              ...msg,
+              createdAt: msg.createdAt ?? new Date(),
+            })) as UIMessage[]
+          ];
 
           const projectedUISection = uiSection
             .map((message) => {

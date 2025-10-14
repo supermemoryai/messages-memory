@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import type { Session } from 'next-auth';
 import { useRouter } from 'next/navigation';
-import type { Message } from 'ai';
+import type { UIMessage } from 'ai';
 
 import { ModelSelector } from '@/components/model-selector';
 import { VisibilitySelector, type VisibilityType } from '@/components/visibility-selector';
@@ -18,7 +18,7 @@ interface ChatHeaderProps {
   selectedVisibilityType: VisibilityType;
   isReadonly: boolean;
   session: Session;
-  setMessages: (messages: Message[] | ((messages: Message[]) => Message[])) => void;
+  setMessages: (messages: UIMessage[] | ((messages: UIMessage[]) => UIMessage[])) => void;
   onChatIdChange?: (newChatId: string) => void;
 }
 

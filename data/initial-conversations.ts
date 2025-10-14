@@ -1,4 +1,4 @@
-import { Conversation } from "../types";
+import type { Conversation } from "../types";
 
 // Helper function to create a timestamp for a specific time ago
 const getTimeAgo = (minutes: number) => {
@@ -9,6 +9,9 @@ const getTimeAgo = (minutes: number) => {
 
 // Fixed UUID for the Supermemory chat - using a consistent UUID so the conversation persists
 const SUPERMEMORY_CHAT_ID = "00000000-0000-0000-0000-000000000001";
+
+// Fixed UUID for the Profile chat - read-only chat showing user profile
+const PROFILE_CHAT_ID = "00000000-0000-0000-0000-000000000002";
 
 // Create initial conversation with Supermemory
 export const initialConversations: Conversation[] = [
@@ -34,7 +37,35 @@ export const initialConversations: Conversation[] = [
       },
     ],
   },
+  {
+    id: PROFILE_CHAT_ID,
+    recipients: [
+      {
+        id: "profile-assistant",
+        name: "Profile",
+        bio: "Your Supermemory profile",
+        title: "Profile",
+      },
+    ],
+    lastMessageTime: getTimeAgo(0),
+    unreadCount: 0,
+    pinned: true,
+    messages: [
+      {
+        id: "profile-question",
+        content: "who am i",
+        sender: "You",
+        timestamp: getTimeAgo(1),
+      },
+      {
+        id: "profile-response",
+        content: "Loading your profile...",
+        sender: "Profile",
+        timestamp: getTimeAgo(0),
+      },
+    ],
+  },
 ];
 
-// Export the constant for use in other files
-export { SUPERMEMORY_CHAT_ID };
+// Export the constants for use in other files
+export { SUPERMEMORY_CHAT_ID, PROFILE_CHAT_ID };

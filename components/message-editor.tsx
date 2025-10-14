@@ -1,6 +1,6 @@
 'use client';
 
-import type { Message } from 'ai';
+import type { UIMessage } from 'ai';
 import { Button } from './ui/button';
 import {
   type Dispatch,
@@ -14,7 +14,7 @@ import { deleteTrailingMessages } from '@/app/(chat)/actions';
 import type { UseChatHelpers } from '@ai-sdk/react';
 
 export type MessageEditorProps = {
-  message: Message;
+  message: UIMessage;
   setMode: Dispatch<SetStateAction<'view' | 'edit' | 'delete'>>;
   setMessages: UseChatHelpers['setMessages'];
   reload: UseChatHelpers['reload'];

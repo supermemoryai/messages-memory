@@ -109,8 +109,24 @@ function PureMultimodalInput({
   const [uploadQueue, setUploadQueue] = useState<Array<string>>([]);
 
   const submitForm = useCallback(() => {
-    handleSubmit(undefined, {
-      experimental_attachments: attachments,
+    const textPart = {
+      type: 'text' as const,
+      text: input,
+    };
+    
+    const fileParts = attachments.map(attachment => ({
+      type: 'file' as const,
+      url: attachment.url,
+      name: attachment.name,
+      mediaType: attachment.contentType,
+    }));
+
+    const parts = [textPart, ...fileParts];
+
+    append({
+      role: 'user',
+      content: input,
+      parts,
     });
 
     setAttachments([]);
@@ -122,7 +138,8 @@ function PureMultimodalInput({
     }
   }, [
     attachments,
-    handleSubmit,
+    append,
+    input,
     setAttachments,
     setLocalStorageInput,
     width,

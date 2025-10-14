@@ -1,12 +1,6 @@
 import { customProvider } from 'ai';
 import { xai } from '@ai-sdk/xai';
 import { isTestEnvironment } from '../constants';
-import {
-  artifactModel,
-  chatModel,
-  reasoningModel,
-  titleModel,
-} from './models.test';
 import { createAnthropic } from '@ai-sdk/anthropic';
 
 if (!process.env.SUPERMEMORY_API_KEY) {
