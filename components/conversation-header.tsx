@@ -2,13 +2,14 @@ import { Icons } from "./icons";
 import type { Conversation } from "../types";
 import { Logo } from "./logo";
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
-import { initialContacts } from "../data/initial-contacts";
+import { createInitialContactsForUser } from "../data/initial-contacts";
 import { useToast } from "@/hooks/use-toast";
 import { cn, } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { getUserContacts, addUserContact } from "@/lib/contacts";
 import { ContactDrawer } from "./contact-drawer";
-import { RotateCcw } from "lucide-react";
+import { RotateCcw, Trash2, MessageSquarePlus } from "lucide-react";
+import { signOut, signIn } from "next-auth/react";
 
 // Helper to check if we can add more recipients
 const hasReachedMaxRecipients = (recipients: string) => {
@@ -38,6 +39,7 @@ interface ConversationHeaderProps {
   showCompactNewChat?: boolean;
   setShowCompactNewChat?: (show: boolean) => void;
   onClearChat?: () => void;
+  userId?: string; // Add userId prop
 }
 
 interface RecipientPillProps {
@@ -53,7 +55,7 @@ interface RecipientSearchProps {
   showResults: boolean;
   selectedIndex: number;
   handleKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => void;
-  handlePersonSelect: (person: (typeof initialContacts)[0]) => void;
+  handlePersonSelect: (person: { name: string; title?: string; prompt?: string; bio?: string; avatar?: string }) => void;
   handleAddContact: () => Promise<void>;
   setSelectedIndex: (index: number) => void;
   setShowResults: (show: boolean) => void;
@@ -61,6 +63,7 @@ interface RecipientSearchProps {
   isMobileView?: boolean;
   recipientInput: string;
   isValidating: boolean;
+  userId?: string;
 }
 
 // Sub-components
@@ -114,6 +117,7 @@ function RecipientSearch({
   isMobileView,
   recipientInput,
   isValidating,
+  userId,
 }: RecipientSearchProps) {
   const searchRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -144,7 +148,7 @@ function RecipientSearch({
       .map((r) => r.trim())
       .filter(Boolean);
 
-    const combined = [...initialContacts];
+    const combined = [...createInitialContactsForUser(userId || 'default')];
     const userContacts = getUserContacts();
 
     // Add user contacts, avoiding duplicates
@@ -168,7 +172,7 @@ function RecipientSearch({
     });
 
     return filtered.sort((a, b) => a.name.localeCompare(b.name));
-  }, [searchValue, recipientInput]);
+  }, [searchValue, recipientInput, userId]);
 
   return (
     <div
@@ -288,6 +292,7 @@ export function ConversationHeader({
   showCompactNewChat = false,
   setShowCompactNewChat = () => {},
   onClearChat,
+  userId,
 }: ConversationHeaderProps) {
   const { toast } = useToast();
   const [searchValue, setSearchValue] = useState("");
@@ -376,7 +381,7 @@ export function ConversationHeader({
       .map((r) => r.trim())
       .filter(Boolean);
 
-    const combined = [...initialContacts];
+    const combined = [...createInitialContactsForUser(userId || 'default')];
     const userContacts = getUserContacts();
 
     // Add user contacts, avoiding duplicates
@@ -400,7 +405,7 @@ export function ConversationHeader({
     });
 
     return filtered.sort((a, b) => a.name.localeCompare(b.name));
-  }, [searchValue, recipientInput]);
+  }, [searchValue, recipientInput, userId]);
 
   // Handlers
   const updateRecipients = useCallback(() => {
@@ -471,7 +476,7 @@ export function ConversationHeader({
     // Mobile: clicking header in compact mode does nothing (handled by ContactDrawer)
   };
 
-  const handlePersonSelect = (person: (typeof initialContacts)[0]) => {
+  const handlePersonSelect = (person: { name: string; title?: string; prompt?: string; bio?: string; avatar?: string }) => {
     const currentRecipients = recipientInput
       .split(",")
       .map((r) => r.trim())
@@ -585,8 +590,8 @@ export function ConversationHeader({
 
   const handleClearChat = async () => {
     if (!activeConversation) return;
-    
-    const confirmClear = window.confirm('Are you sure you want to clear this chat? This will start a new conversation with a fresh history.');
+
+    const confirmClear = window.confirm('Are you sure you want to clear this chat?\n\nThis will start a new conversation with a fresh history.');
     if (!confirmClear) return;
 
     try {
@@ -600,7 +605,7 @@ export function ConversationHeader({
         if (onClearChat) {
           onClearChat();
         }
-        
+
         toast({
           description: 'Chat cleared! Starting fresh conversation.',
         });
@@ -610,6 +615,75 @@ export function ConversationHeader({
     } catch (error) {
       toast({
         description: 'Failed to clear chat',
+      });
+    }
+  };
+
+  const handleNewConversation = async () => {
+    if (!activeConversation) return;
+
+    const confirmNew = window.confirm('Start a new conversation?\n\nYour memories will be retained, but chat history will be cleared.');
+    if (!confirmNew) return;
+
+    try {
+      const response = await fetch(`/api/chat/clear?id=${activeConversation.id}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        if (onClearChat) {
+          onClearChat();
+        }
+
+        toast({
+          description: 'New conversation started! Memories retained.',
+        });
+      } else {
+        throw new Error('Failed to start new conversation');
+      }
+    } catch (error) {
+      toast({
+        description: 'Failed to start new conversation',
+      });
+    }
+  };
+
+  const handleDeleteAll = async () => {
+    if (!activeConversation) return;
+
+    const confirmDelete = window.confirm('⚠️ WARNING: This will permanently delete ALL your memories and conversation history.\n\nThis action cannot be undone.\n\nAre you sure?');
+    if (!confirmDelete) return;
+
+    try {
+      const response = await fetch(`/api/chat/delete-all?id=${activeConversation.id}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        // Clear all localStorage
+        if (typeof window !== 'undefined') {
+          localStorage.clear();
+        }
+
+        toast({
+          description: 'All memories deleted! Signing in as new user...',
+        });
+
+        // Sign out current user and sign in as a new guest
+        // This will create a new anonymous user with a new userId
+        await signOut({ redirect: false });
+
+        // Sign in as a new guest user
+        await signIn('guest', { redirect: false });
+
+        // Reload the page to start fresh
+        window.location.href = '/';
+      } else {
+        throw new Error('Failed to delete all');
+      }
+    } catch (error) {
+      toast({
+        description: 'Failed to delete all data',
       });
     }
   };
@@ -731,6 +805,7 @@ export function ConversationHeader({
                         isMobileView={isMobileView}
                         recipientInput={recipientInput}
                         isValidating={isValidating}
+                        userId={userId}
                       />
                     )}
                   </div>
@@ -762,6 +837,7 @@ export function ConversationHeader({
                         recipientCount={activeConversation.recipients.length}
                         recipients={
                           activeConversation?.recipients.map((recipient) => {
+                            const initialContacts = createInitialContactsForUser(userId || 'default');
                             const contact = initialContacts.find(
                               (p) => p.name === recipient.name
                             );
@@ -788,19 +864,32 @@ export function ConversationHeader({
             )}
           </div>
           
-          {/* Mobile Clear Chat Button - only show for Supermemory chat */}
-          {!isNewChat && activeConversation && activeConversation.recipients.some(r => r.id === 'supermemory-ai') && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleClearChat();
-              }}
-              className="absolute right-4 top-8 p-2 hover:bg-accent rounded-full transition-colors"
-              aria-label="Clear chat"
-              title="Clear chat and start fresh"
-            >
-              <RotateCcw className="h-5 w-5" />
-            </button>
+          {/* Mobile Action Buttons - only show for Supermemory chat */}
+          {!isNewChat && activeConversation && activeConversation.recipients.some(r => r.name === 'Supermemory') && (
+            <div className="absolute right-4 top-8 flex gap-1">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleNewConversation();
+                }}
+                className="p-2 hover:bg-accent rounded-full transition-colors"
+                aria-label="New conversation (keep memories)"
+                title="Start new conversation (keep memories)"
+              >
+                <MessageSquarePlus className="h-5 w-5" />
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDeleteAll();
+                }}
+                className="p-2 hover:bg-red-100 dark:hover:bg-red-900/20 rounded-full transition-colors text-red-600 dark:text-red-400"
+                aria-label="Delete all memories and history"
+                title="Delete all memories and history"
+              >
+                <Trash2 className="h-5 w-5" />
+              </button>
+            </div>
           )}
         </div>
       ) : (
@@ -836,6 +925,7 @@ export function ConversationHeader({
                         isMobileView={isMobileView}
                         recipientInput={recipientInput}
                         isValidating={isValidating}
+                        userId={userId}
                       />
                     )}
                   </div>
@@ -867,19 +957,32 @@ export function ConversationHeader({
             )}
           </div>
           
-          {/* Desktop Clear Chat Button - only show for Supermemory chat */}
-          {!isNewChat && activeConversation && activeConversation.recipients.some(r => r.id === 'supermemory-ai') && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleClearChat();
-              }}
-              className="ml-auto p-2 hover:bg-accent rounded-full transition-colors"
-              aria-label="Clear chat"
-              title="Clear chat and start fresh"
-            >
-              <RotateCcw className="h-5 w-5" />
-            </button>
+          {/* Desktop Action Buttons - only show for Supermemory chat */}
+          {!isNewChat && activeConversation && activeConversation.recipients.some(r => r.name === 'Supermemory') && (
+            <div className="ml-auto flex gap-1">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleNewConversation();
+                }}
+                className="p-2 hover:bg-accent rounded-full transition-colors"
+                aria-label="New conversation (keep memories)"
+                title="Start new conversation (keep memories)"
+              >
+                <MessageSquarePlus className="h-5 w-5" />
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDeleteAll();
+                }}
+                className="p-2 hover:bg-red-100 dark:hover:bg-red-900/20 rounded-full transition-colors text-red-600 dark:text-red-400"
+                aria-label="Delete all memories and history"
+                title="Delete all memories and history"
+              >
+                <Trash2 className="h-5 w-5" />
+              </button>
+            </div>
           )}
         </div>
       )}

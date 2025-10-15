@@ -30,6 +30,7 @@ interface ChatAreaProps {
   unreadCount?: number;
   onClearChat?: () => void;
   isReadOnly?: boolean;
+  userId?: string;
 }
 
 export function ChatArea({
@@ -50,6 +51,7 @@ export function ChatArea({
   unreadCount = 0,
   onClearChat,
   isReadOnly = false,
+  userId,
 }: ChatAreaProps) {
   const [inputValue, setInputValue] = useState(messageDraft);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -173,11 +175,6 @@ export function ChatArea({
   if (!activeConversation && !isNewChat) {
     return (
       <div className="flex-1 flex items-center justify-center bg-background">
-        <div className="text-center px-4">
-          <div className="text-6xl mb-4">💬</div>
-          <h2 className="text-2xl font-normal mb-2">Welcome to Supermemory</h2>
-          <p className="text-muted-foreground text-base">Select a conversation to start chatting</p>
-        </div>
       </div>
     );
   }
@@ -196,6 +193,7 @@ export function ChatArea({
           onUpdateConversationName={onUpdateConversationName}
           onHideAlertsChange={onHideAlertsChange}
           onClearChat={onClearChat}
+          userId={userId}
         />
       </div>
 
@@ -284,7 +282,7 @@ export function ChatArea({
                           <div className={cn(
                             "prose prose-sm max-w-none",
                             isMe ? "prose-invert" : "dark:prose-invert",
-                            "[&_p]:my-0 [&_p]:leading-[22px]",
+                            "[&_p]:my-1 [&_p]:leading-[22px] [&_p:first-child]:mt-0 [&_p:last-child]:mb-0",
                             "[&_h1]:text-xl [&_h1]:mt-2 [&_h1]:mb-1",
                             "[&_h2]:text-lg [&_h2]:mt-2 [&_h2]:mb-1",
                             "[&_h3]:text-base [&_h3]:mt-2 [&_h3]:mb-1",

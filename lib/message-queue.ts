@@ -155,7 +155,7 @@ export class MessageQueue {
         throw new Error(`API request failed: ${response.status}`);
       }
 
-      // Handle streaming response
+      // Handle streaming response (AI SDK v5 format)
       const reader = response.body?.getReader();
       const decoder = new TextDecoder();
       let accumulatedText = "";
@@ -166,44 +166,44 @@ export class MessageQueue {
 
       // Create a temporary message that we'll update as we stream
       const newMessageId = crypto.randomUUID();
-      
+
       while (true) {
         const { done, value } = await reader.read();
-        
+
         if (done) break;
-        
+
         const chunk = decoder.decode(value, { stream: true });
         const lines = chunk.split('\n');
-        
+
         for (const line of lines) {
-          if (line.startsWith('0:')) {
-            // This is a text chunk
+          // Skip empty lines
+          if (!line.trim()) continue;
+
+          // AI SDK v5 uses SSE format with "data: " prefix
+          if (line.startsWith('data: ')) {
+            const jsonStr = line.slice(6).trim(); // Remove "data: " prefix
+
+            // Skip [DONE] marker
+            if (jsonStr === '[DONE]') continue;
+
             try {
-              const jsonStr = line.slice(2).trim();
-              if (jsonStr) {
-                const parsed = JSON.parse(jsonStr);
-                if (parsed && typeof parsed === 'string') {
-                  accumulatedText += parsed;
-                }
+              const parsed = JSON.parse(jsonStr);
+
+              // Handle text-delta events for streaming text
+              if (parsed.type === 'text-delta' && parsed.delta) {
+                accumulatedText += parsed.delta;
               }
-            } catch (e) {
-              // Ignore parse errors for partial chunks
-            }
-          } else if (line.startsWith('3:')) {
-            // This is an error message
-            try {
-              const jsonStr = line.slice(2).trim();
-              if (jsonStr) {
-                const parsed = JSON.parse(jsonStr);
-                if (parsed && typeof parsed === 'string') {
-                  throw new Error(`Stream error: ${parsed}`);
-                }
+
+              // Handle error events
+              if (parsed.type === 'error') {
+                throw new Error(`Stream error: ${parsed.message || 'Unknown error'}`);
               }
             } catch (e) {
               if (e instanceof Error && e.message.startsWith('Stream error:')) {
                 throw e;
               }
               // Ignore parse errors for partial chunks
+              console.debug('Failed to parse stream chunk:', jsonStr);
             }
           }
         }

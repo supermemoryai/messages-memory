@@ -66,12 +66,14 @@ export function Chat({
     generateId: generateUUID,
     fetch: fetchWithErrorHandlers,
 
-    experimental_prepareRequestBody: (body) => ({
-      id,
-      message: body.messages.at(-1),
-      selectedChatModel: initialChatModel,
-      selectedVisibilityType: visibilityType,
-    }),
+    experimental_prepareRequestBody: (body) => {
+      return {
+        id,
+        message: body.messages.at(-1),
+        selectedChatModel: initialChatModel,
+        selectedVisibilityType: visibilityType,
+      };
+    },
 
     onFinish: (_, { usage }) => {
       mutate(unstable_serialize(getChatHistoryPaginationKey));

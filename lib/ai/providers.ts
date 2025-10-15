@@ -22,13 +22,8 @@ const supermemory = (user?: string) => {
 
   return createAnthropic({
     baseURL:
-      'https://api.supermemory.ai/v3/https://api.anthropic.com/v1?userId=' +
-      user,
+      'https://api.anthropic.com/v1',
     apiKey: process.env.ANTHROPIC_API_KEY,
-    headers: {
-      // @ts-ignore
-      'x-supermemory-api-key': process.env.SUPERMEMORY_API_KEY,
-    },
   }).languageModel('claude-3-5-sonnet-latest');
 };
 
@@ -36,10 +31,10 @@ export const myProvider = isTestEnvironment
   ? (user?: string) =>
       customProvider({
         languageModels: {
-          'chat-model': chatModel,
-          'chat-model-reasoning': reasoningModel,
-          'title-model': titleModel,
-          'artifact-model': artifactModel,
+          'chat-model': supermemory(user),
+          'chat-model-reasoning': supermemory(user),
+          'title-model': supermemory(user),
+          'artifact-model': supermemory(user),
         },
       })
   : (user?: string) => {

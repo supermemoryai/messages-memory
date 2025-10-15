@@ -93,6 +93,10 @@ export function SidebarUserNav({ user }: { user: User }) {
                   if (isGuest) {
                     router.push('/login');
                   } else {
+                    // Clear container tag on logout
+                    if (typeof window !== 'undefined') {
+                      localStorage.removeItem('supermemory_container_tag');
+                    }
                     signOut({
                       redirectTo: '/',
                     });

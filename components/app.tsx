@@ -6,7 +6,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { Nav } from "./nav";
 import type { Conversation, Message, Reaction, Attachment } from "../types";
 import { generateUUID } from "@/lib/utils";
-import { initialConversations, SUPERMEMORY_CHAT_ID, PROFILE_CHAT_ID } from "../data/initial-conversations";
+import { createInitialConversationsForUser, getUserSpecificSupermemoryId, getUserSpecificProfileId } from "../data/initial-conversations";
 import { MessageQueue } from "../lib/message-queue";
 import { useToast } from "@/hooks/use-toast";
 import { CommandMenu } from "./command-menu";
@@ -20,6 +20,7 @@ export default function App() {
   const [activeConversation, setActiveConversation] = useState<string | null>(
     null
   );
+  const [userId, setUserId] = useState<string | null>(null);
   const [lastActiveConversation, setLastActiveConversation] = useState<
     string | null
   >(null);
@@ -37,6 +38,7 @@ export default function App() {
   const [isCommandMenuOpen, setIsCommandMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(soundEffects.isEnabled());
+  const [pendingProfileRefresh, setPendingProfileRefresh] = useState(false);
 
   // Add command menu ref
   const commandMenuRef = useRef<{ setOpen: (open: boolean) => void }>(null);
@@ -117,6 +119,23 @@ export default function App() {
     }
   }, [conversations]);
 
+  // Initialize user ID early
+  useEffect(() => {
+    const fetchUserId = async () => {
+      try {
+        const response = await fetch('/api/profile');
+        if (response.ok) {
+          const { profile } = await response.json();
+          setUserId(profile.userId);
+        }
+      } catch (error) {
+        console.error('Error fetching user profile for initialization:', error);
+      }
+    };
+    
+    fetchUserId();
+  }, []); // Run only once on mount
+
   // Fetch and update user profile for the profile chat
   const updateProfileChat = useCallback(async () => {
     try {
@@ -124,80 +143,48 @@ export default function App() {
       if (response.ok) {
         const { profile } = await response.json();
         
-        // Format profile as a readable message
-        let profileContent = `# Your Supermemory Profile\n\n`;
-        profileContent += `This is the profile that AI models use to personalize responses when you chat.\n\n`;
-        profileContent += `**User ID:** \`${profile.userId}\`\n`;
-        if (profile.name) profileContent += `**Name:** ${profile.name}\n`;
-        if (profile.email) profileContent += `**Email:** ${profile.email}\n\n`;
+        // Set the user ID for use throughout the app
+        setUserId(profile.userId);
         
-        profileContent += `---\n\n`;
+        // Show container tag and static/dynamic profile data with proper labels
+        let profileContent = `**Container Tag:**\n${profile.userId}\n\n`;
         
-        // Add summary/context if available
-        if (profile.summary || profile.context) {
-          profileContent += `## Profile Summary\n\n`;
-          profileContent += `${profile.summary || profile.context}\n\n`;
-        }
-        
-        // Add facts if available
-        if (profile.facts && profile.facts.length > 0) {
-          profileContent += `## Facts About You\n\n`;
-          profile.facts.forEach((fact: string) => {
-            profileContent += `- ${fact}\n`;
+        // Show static profile data
+        if (profile.static && profile.static.length > 0) {
+          profileContent += `**Static:**\n`;
+          profile.static.forEach((item: any) => {
+            profileContent += `• ${item}\n\n`;
           });
-          profileContent += `\n`;
         }
         
-        // Add preferences if available
-        if (profile.preferences && profile.preferences.length > 0) {
-          profileContent += `## Your Preferences\n\n`;
-          profile.preferences.forEach((pref: string) => {
-            profileContent += `- ${pref}\n`;
+        // Show dynamic profile data  
+        if (profile.dynamic && profile.dynamic.length > 0) {
+          profileContent += `**Dynamic:**\n`;
+          profile.dynamic.forEach((item: any) => {
+            profileContent += `• ${item}\n\n`;
           });
-          profileContent += `\n`;
         }
         
-        // Add recent memories if available
-        if (profile.memories && profile.memories.length > 0) {
-          profileContent += `## Recent Memories\n\n`;
-          profile.memories.slice(0, 10).forEach((memory: any) => {
-            if (memory.content) {
-              profileContent += `- ${memory.content.substring(0, 200)}${memory.content.length > 200 ? '...' : ''}\n`;
-            }
-          });
-          profileContent += `\n`;
-        }
-        
-        // If no data available
-        if (!profile.summary && !profile.context && !profile.facts?.length && !profile.preferences?.length && !profile.memories?.length) {
-          profileContent += `## No Profile Data Yet\n\n`;
-          profileContent += `Your profile is empty. Start chatting with Supermemory to build your personalized profile!\n\n`;
-          profileContent += `The AI will learn about:\n`;
-          profileContent += `- Your preferences and interests\n`;
-          profileContent += `- Your background and skills\n`;
-          profileContent += `- Your projects and work\n`;
-          profileContent += `- Important facts about you\n\n`;
-          profileContent += `This profile is automatically used to personalize all AI responses.`;
-        } else {
-          profileContent += `---\n\n`;
-          profileContent += `*This profile is automatically injected into AI conversations via the [Supermemory AI SDK](https://supermemory.ai/docs/ai-sdk/user-profiles) for personalized responses.*`;
+        if (!profile.static?.length && !profile.dynamic?.length) {
+          profileContent += `**Static:**\n(empty)\n\n**Dynamic:**\n(empty)`;
         }
         
         // Update the profile chat with the new profile content
+        const userProfileChatId = getUserSpecificProfileId(profile.userId);
         setConversations((prev) =>
           prev.map((conv) => {
-            if (conv.id === PROFILE_CHAT_ID) {
+            if (conv.id === userProfileChatId) {
               return {
                 ...conv,
                 messages: [
                   {
-                    id: 'profile-question',
+                    id: getUserSpecificProfileId(profile.userId) + '-question',
                     content: 'who am i',
-                    sender: 'You',
+                    sender: 'me',
                     timestamp: new Date(Date.now() - 60000).toISOString(),
                   },
                   {
-                    id: 'profile-response',
+                    id: getUserSpecificProfileId(profile.userId) + '-response',
                     content: profileContent,
                     sender: 'Profile',
                     timestamp: new Date().toISOString(),
@@ -220,7 +207,7 @@ export default function App() {
   const [lastProfileChatView, setLastProfileChatView] = useState<number>(0);
   
   useEffect(() => {
-    if (activeConversation === PROFILE_CHAT_ID) {
+    if (userId && activeConversation === getUserSpecificProfileId(userId)) {
       // Always fetch when switching to profile chat
       updateProfileChat();
       setLastProfileChatView(Date.now());
@@ -229,7 +216,36 @@ export default function App() {
       const interval = setInterval(updateProfileChat, 30000);
       return () => clearInterval(interval);
     }
-  }, [activeConversation, updateProfileChat]);
+  }, [activeConversation, updateProfileChat, userId]);
+
+  // Function to trigger automatic profile refresh after Supermemory responses
+  const triggerProfileRefresh = useCallback(() => {
+    if (!userId) return;
+    
+    setPendingProfileRefresh(true);
+    
+    // Show notification that profile will be updated
+    toast({
+      description: "Updating your profile with new information...",
+    });
+    
+    // Wait 10 seconds then refresh profile
+    setTimeout(() => {
+      updateProfileChat().then(() => {
+        setPendingProfileRefresh(false);
+        toast({
+          description: "Profile updated with latest information!",
+        });
+      }).catch((error) => {
+        console.error('Error updating profile:', error);
+        setPendingProfileRefresh(false);
+        toast({
+          description: "Profile update completed.",
+          variant: "default"
+        });
+      });
+    }, 10000); // 10 second delay
+  }, [userId, updateProfileChat, toast]);
 
   // Set mobile view
   useEffect(() => {
@@ -269,8 +285,10 @@ export default function App() {
     conversations,
   ]);
 
-  // Get conversations from local storage
+  // Get conversations from local storage (only after userId is available)
   useEffect(() => {
+    if (!userId) return; // Wait for userId to be set
+    
     const initializeConversations = async () => {
       const saved = localStorage.getItem(STORAGE_KEY);
       const urlParams = new URLSearchParams(window.location.search);
@@ -303,9 +321,12 @@ export default function App() {
       // Store the final chat ID
       localStorage.setItem(CHAT_ID_KEY, chatId);
 
-      // Start with initial conversations, but use the real chat ID
+      // Start with initial conversations using user-specific IDs
+      const initialConversations = createInitialConversationsForUser(userId);
+      const userSupermemoryId = getUserSpecificSupermemoryId(userId);
+      
       let allConversations = initialConversations.map(conv => 
-        conv.id === SUPERMEMORY_CHAT_ID 
+        conv.id === userSupermemoryId 
           ? { ...conv, id: chatId }
           : conv
       );
@@ -322,7 +343,7 @@ export default function App() {
 
         // Migration: Update old IDs to the current user's chat ID
         const migratedConversations = parsedConversations.map((conv) => {
-          if (conv.id === "supermemory-chat" || conv.id === SUPERMEMORY_CHAT_ID) {
+          if (conv.id === "supermemory-chat" || conv.id === userSupermemoryId) {
             return { ...conv, id: chatId };
           }
           return conv;
@@ -363,7 +384,7 @@ export default function App() {
     // Handle conversation selection after setting conversations
     if (urlConversationId) {
       // Migration: Update URL if it has the old ID
-      const migratedUrlId = (urlConversationId === "supermemory-chat" || urlConversationId === SUPERMEMORY_CHAT_ID)
+      const migratedUrlId = (urlConversationId === "supermemory-chat" || urlConversationId === getUserSpecificSupermemoryId(userId))
         ? chatId
         : urlConversationId;
       
@@ -397,7 +418,7 @@ export default function App() {
     
     // Call the async initialization function
     initializeConversations();
-  }, [isMobileView]);
+  }, [userId, isMobileView]); // Add userId as dependency
 
   // Update lastActiveConversation whenever activeConversation changes
   useEffect(() => {
@@ -436,6 +457,27 @@ export default function App() {
           // Play received sound if message is in inactive conversation, not from us, and alerts aren't hidden
           if (shouldIncrementUnread && !conversation.hideAlerts) {
             soundEffects.playUnreadSound();
+          }
+
+          // Trigger profile refresh for Supermemory responses (not from user, not in profile chat)
+          const isSupermemoryChat = userId && conversationId === getUserSpecificSupermemoryId(userId);
+          const isProfileChat = userId && conversationId === getUserSpecificProfileId(userId);
+          
+          console.log('[Profile Refresh Debug]', {
+            conversationId,
+            userId,
+            supermemoryId: userId ? getUserSpecificSupermemoryId(userId) : null,
+            profileId: userId ? getUserSpecificProfileId(userId) : null,
+            isSupermemoryChat,
+            isProfileChat,
+            messageSender: message.sender,
+            pendingProfileRefresh,
+            shouldTrigger: isSupermemoryChat && message.sender !== "me" && !isProfileChat && !pendingProfileRefresh
+          });
+          
+          if (isSupermemoryChat && message.sender !== "me" && !isProfileChat && !pendingProfileRefresh) {
+            console.log('[Profile Refresh] Triggering profile refresh...');
+            triggerProfileRefresh();
           }
 
           return prev.map((conv) =>
@@ -568,8 +610,8 @@ export default function App() {
     const messageText = extractMessageContent(messageHtml);
     if (!messageText.trim() && (!attachments || attachments.length === 0)) return;
 
-    // For Supermemory, we always use the existing conversation
-    const targetConversationId = conversationId || SUPERMEMORY_CHAT_ID;
+    // Use the provided conversationId, or default to the main Supermemory chat
+    const targetConversationId = conversationId || getUserSpecificSupermemoryId(userId || '');
     const conversation = conversations.find((c) => c.id === targetConversationId);
     
     if (!conversation) {
@@ -613,7 +655,7 @@ export default function App() {
   // Method to handle conversation deletion
   const handleDeleteConversation = (id: string) => {
     // Don't allow deleting the Supermemory conversation
-    if (id === SUPERMEMORY_CHAT_ID) {
+    if (id === getUserSpecificSupermemoryId(userId || '')) {
       toast({
         description: "Cannot delete the Supermemory conversation",
       });
@@ -886,7 +928,8 @@ export default function App() {
               }
               onMessageDraftChange={handleMessageDraftChange}
               unreadCount={totalUnreadCount}
-              isReadOnly={activeConversation === PROFILE_CHAT_ID}
+              isReadOnly={userId ? activeConversation === getUserSpecificProfileId(userId) : false}
+              userId={userId || undefined}
             />
           </div>
         </div>

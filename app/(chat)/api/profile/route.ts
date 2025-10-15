@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 
 export const maxDuration = 30;
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const session = await auth();
 
@@ -11,7 +11,9 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const userId = session.user.id;
+    // Always use user ID as container tag
+    const containerTag = session.user.id;
+    console.log('[Profile API] Using container tag:', containerTag);
 
     // Fetch user profile from Supermemory using search with profile mode
     if (!process.env.SUPERMEMORY_API_KEY) {
@@ -22,9 +24,8 @@ export async function GET() {
     }
 
     try {
-      // Use Supermemory v4 profile API to get the user's profile
-      // This is the same profile that gets injected into LLM calls
-      // containerTag is the user's session ID (dynamically generated, not hardcoded)
+      // Use the actual Supermemory v4/profile API
+      console.log('[Profile API] Fetching profile from Supermemory with containerTag:', containerTag);
       const response = await fetch('https://api.supermemory.ai/v4/profile', {
         method: 'POST',
         headers: {
@@ -32,7 +33,7 @@ export async function GET() {
           'x-api-key': process.env.SUPERMEMORY_API_KEY,
         },
         body: JSON.stringify({
-          containerTag: userId,
+          containerTag: containerTag,
         }),
       });
 
@@ -40,11 +41,12 @@ export async function GET() {
         console.error('[Profile API] Failed to fetch profile:', response.status);
         const errorText = await response.text();
         console.error('[Profile API] Error details:', errorText);
+        console.error('[Profile API] Response headers:', Object.fromEntries(response.headers.entries()));
         
         return NextResponse.json(
           {
             profile: {
-              userId: userId,
+              userId: session.user.id,
               name: session.user.name || session.user.email || 'User',
               email: session.user.email,
               summary: 'No profile data available yet. Start chatting to build your profile!',
@@ -56,26 +58,20 @@ export async function GET() {
       }
 
       const data = await response.json();
+      console.log('[Profile API] Supermemory response:', JSON.stringify(data, null, 2));
       
-      // v4/profile returns the profile data directly
+      // Return the profile data exactly as Supermemory returns it
       const profile = data.profile || data;
       
-      return NextResponse.json({ 
-        profile: {
-          userId: userId,
-          name: session.user.name || session.user.email || 'User',
-          email: session.user.email,
-          summary: profile.summary || profile.context || '',
-          facts: profile.facts || [],
-          preferences: profile.preferences || [],
-          context: profile.context || '',
-          memories: (profile.memories || []).slice(0, 10).map((memory: any) => ({
-            content: memory.content || memory.text || '',
-            timestamp: memory.createdAt || memory.timestamp,
-            source: memory.source || memory.metadata?.source,
-          })),
-        }
-      }, { status: 200 });
+      const result = {
+        userId: session.user.id,
+        static: profile.static || [],
+        dynamic: profile.dynamic || [],
+      };
+      
+      console.log('[Profile API] Final profile result:', JSON.stringify(result, null, 2));
+      
+      return NextResponse.json({ profile: result }, { status: 200 });
     } catch (fetchError) {
       console.error('[Profile API] Error fetching from Supermemory:', fetchError);
       
@@ -83,7 +79,7 @@ export async function GET() {
       return NextResponse.json(
         {
           profile: {
-            userId: userId,
+            userId: session.user.id,
             name: session.user.name || session.user.email || 'User',
             email: session.user.email,
             summary: 'Unable to fetch profile data at this time.',

@@ -1,4 +1,5 @@
 import type { Conversation } from "../types";
+import { createHash } from "crypto";
 
 // Helper function to create a timestamp for a specific time ago
 const getTimeAgo = (minutes: number) => {
@@ -7,65 +8,91 @@ const getTimeAgo = (minutes: number) => {
   return date.toISOString();
 };
 
-// Fixed UUID for the Supermemory chat - using a consistent UUID so the conversation persists
-const SUPERMEMORY_CHAT_ID = "00000000-0000-0000-0000-000000000001";
+// Generate deterministic but user-specific UUIDs using secure hash
+const generateUserSpecificId = (userId: string, suffix: string): string => {
+  const hash = createHash('sha256').update(`${userId}-${suffix}`).digest('hex');
+  // Convert to UUID format: 8-4-4-4-12
+  return [
+    hash.substring(0, 8),
+    hash.substring(8, 12),
+    hash.substring(12, 16),
+    hash.substring(16, 20),
+    hash.substring(20, 32)
+  ].join('-');
+};
 
-// Fixed UUID for the Profile chat - read-only chat showing user profile
-const PROFILE_CHAT_ID = "00000000-0000-0000-0000-000000000002";
+// Factory function to create user-specific initial conversations
+export const createInitialConversationsForUser = (userId: string): Conversation[] => {
+  // Generate user-specific IDs - deterministic but unique per user
+  const supermemoryId = generateUserSpecificId(userId, 'supermemory-chat');
+  const profileId = generateUserSpecificId(userId, 'profile-chat');
+  const supermemoryAssistantId = generateUserSpecificId(userId, 'supermemory-assistant');
+  const profileAssistantId = generateUserSpecificId(userId, 'profile-assistant');
+  const welcomeMessageId = generateUserSpecificId(userId, 'welcome-message');
+  const profileQuestionId = generateUserSpecificId(userId, 'profile-question');
+  const profileResponseId = generateUserSpecificId(userId, 'profile-response');
 
-// Create initial conversation with Supermemory
-export const initialConversations: Conversation[] = [
-  {
-    id: SUPERMEMORY_CHAT_ID,
-    recipients: [
-      {
-        id: "supermemory-ai",
-        name: "Supermemory",
-        bio: "Your AI-powered memory assistant",
-        title: "AI Assistant",
-      },
-    ],
-    lastMessageTime: getTimeAgo(1),
-    unreadCount: 0,
-    pinned: true,
-    messages: [
-      {
-        id: "welcome-message",
-        content: "Hello! I'm Supermemory, your AI-powered memory assistant. I can help you remember, organize, and find information. What would you like to know or discuss today?",
-        sender: "Supermemory",
-        timestamp: getTimeAgo(5),
-      },
-    ],
-  },
-  {
-    id: PROFILE_CHAT_ID,
-    recipients: [
-      {
-        id: "profile-assistant",
-        name: "Profile",
-        bio: "Your Supermemory profile",
-        title: "Profile",
-      },
-    ],
-    lastMessageTime: getTimeAgo(0),
-    unreadCount: 0,
-    pinned: true,
-    messages: [
-      {
-        id: "profile-question",
-        content: "who am i",
-        sender: "You",
-        timestamp: getTimeAgo(1),
-      },
-      {
-        id: "profile-response",
-        content: "Loading your profile...",
-        sender: "Profile",
-        timestamp: getTimeAgo(0),
-      },
-    ],
-  },
-];
+  return [
+    {
+      id: supermemoryId,
+      recipients: [
+        {
+          id: supermemoryAssistantId,
+          name: "Supermemory",
+          bio: "Your AI-powered memory assistant",
+          title: "AI Assistant",
+        },
+      ],
+      lastMessageTime: getTimeAgo(1),
+      unreadCount: 0,
+      pinned: true,
+      messages: [
+        {
+          id: welcomeMessageId,
+          content: "Hello! I'm Supermemory, your AI-powered memory assistant. I can help you remember, organize, and find information. What would you like to know or discuss today?",
+          sender: "Supermemory",
+          timestamp: getTimeAgo(5),
+        },
+      ],
+    },
+    {
+      id: profileId,
+      recipients: [
+        {
+          id: profileAssistantId,
+          name: "Profile",
+          bio: "Your Supermemory profile",
+          title: "Profile",
+        },
+      ],
+      lastMessageTime: getTimeAgo(0),
+      unreadCount: 0,
+      pinned: true,
+      messages: [
+        {
+          id: profileQuestionId,
+          content: "who am i",
+          sender: "me",
+          timestamp: getTimeAgo(1),
+        },
+        {
+          id: profileResponseId,
+          content: "Loading your profile...",
+          sender: "Profile",
+          timestamp: getTimeAgo(0),
+        },
+      ],
+    },
+  ];
+};
 
-// Export the constants for use in other files
-export { SUPERMEMORY_CHAT_ID, PROFILE_CHAT_ID };
+// Helper functions to get user-specific IDs
+export const getUserSpecificSupermemoryId = (userId: string): string => 
+  generateUserSpecificId(userId, 'supermemory-chat');
+
+export const getUserSpecificProfileId = (userId: string): string => 
+  generateUserSpecificId(userId, 'profile-chat');
+
+// Legacy export for backward compatibility - but now requires userId
+export const getInitialConversations = (userId: string): Conversation[] => 
+  createInitialConversationsForUser(userId);
