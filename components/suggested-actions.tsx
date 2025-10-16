@@ -3,12 +3,13 @@
 import { motion } from 'framer-motion';
 import { Button } from './ui/button';
 import { memo } from 'react';
+import type { UIMessage } from 'ai';
 import type { UseChatHelpers } from '@ai-sdk/react';
 import type { VisibilityType } from './visibility-selector';
 
 interface SuggestedActionsProps {
   chatId: string;
-  append: UseChatHelpers['append'];
+  append: (message: any) => void;
   selectedVisibilityType: VisibilityType;
 }
 

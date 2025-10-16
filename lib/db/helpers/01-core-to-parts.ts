@@ -157,21 +157,26 @@ async function migrateMessages() {
         try {
           const uiSection: UIMessage[] = [
             userMessage as UIMessage,
-            ...assistantMessages.map(msg => ({
-              ...msg,
-              createdAt: msg.createdAt ?? new Date(),
-            })) as UIMessage[]
+            ...assistantMessages as UIMessage[]
           ];
 
           const projectedUISection = uiSection
             .map((message) => {
+              // In v5, UIMessage only has id, role, parts, and optional metadata
+              // Extract createdAt from metadata if it exists
+              const createdAt = (message.metadata as any)?.createdAt ?? new Date();
+
               if (message.role === 'user') {
+                // Extract text content from parts
+                const textPart = message.parts.find((p) => p.type === 'text');
+                const content = textPart && textPart.type === 'text' ? textPart.text : '';
+
                 return {
                   id: message.id,
                   chatId: chat.id,
-                  parts: [{ type: 'text', text: message.content }],
+                  parts: [{ type: 'text', text: content }],
                   role: message.role,
-                  createdAt: message.createdAt,
+                  createdAt,
                   attachments: [],
                 } as NewMessageInsert;
               } else if (message.role === 'assistant') {
@@ -184,7 +189,7 @@ async function migrateMessages() {
                   chatId: chat.id,
                   parts: cleanParts,
                   role: message.role,
-                  createdAt: message.createdAt,
+                  createdAt,
                   attachments: [],
                 } as NewMessageInsert;
               }

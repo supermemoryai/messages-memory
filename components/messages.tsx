@@ -10,11 +10,11 @@ import { useMessages } from '@/hooks/use-messages';
 
 interface MessagesProps {
   chatId: string;
-  status: UseChatHelpers['status'];
+  status: UseChatHelpers<UIMessage>['status'];
   votes: Array<Vote> | undefined;
   messages: Array<UIMessage>;
-  setMessages: UseChatHelpers['setMessages'];
-  reload: UseChatHelpers['reload'];
+  setMessages: UseChatHelpers<UIMessage>['setMessages'];
+  regenerate: UseChatHelpers<UIMessage>['regenerate'];
   isReadonly: boolean;
   isArtifactVisible: boolean;
 }
@@ -25,7 +25,7 @@ function PureMessages({
   votes,
   messages,
   setMessages,
-  reload,
+  regenerate,
   isReadonly,
 }: MessagesProps) {
   const {
@@ -46,25 +46,75 @@ function PureMessages({
     >
       {messages.length === 0 && <Greeting />}
 
-      {messages.map((message, index) => (
-        <PreviewMessage
-          key={message.id}
-          chatId={chatId}
-          message={message}
-          isLoading={status === 'streaming' && messages.length - 1 === index}
-          vote={
-            votes
-              ? votes.find((vote) => vote.messageId === message.id)
-              : undefined
+      {messages.flatMap((message, index) => {
+        // Check if this is an assistant message with text that contains SPLIT tags
+        if (message.role === 'assistant') {
+          const textPart = message.parts?.find((part) => part.type === 'text');
+          if (
+            textPart &&
+            textPart.type === 'text' &&
+            /<\s*SPLIT\s*>/gi.test(textPart.text)
+          ) {
+            // Split the text into multiple parts
+            const splitTexts = textPart.text
+              .split(/<\s*SPLIT\s*>/gi)
+              .map((t) => t.trim())
+              .filter((t) => t.length > 0);
+
+            console.log(splitTexts);
+
+            // Return a PreviewMessage for each split part
+            return splitTexts.map((text, splitIndex) => (
+              <PreviewMessage
+                key={`${message.id}-split-${splitIndex}`}
+                chatId={chatId}
+                message={{
+                  ...message,
+                  id: `${message.id}-split-${splitIndex}`,
+                  parts: [{ type: 'text', text }],
+                }}
+                isLoading={
+                  status === 'streaming' &&
+                  messages.length - 1 === index &&
+                  splitIndex === splitTexts.length - 1
+                }
+                vote={
+                  votes
+                    ? votes.find((vote) => vote.messageId === message.id)
+                    : undefined
+                }
+                setMessages={setMessages}
+                regenerate={regenerate}
+                isReadonly={isReadonly}
+                requiresScrollPadding={
+                  hasSentMessage && index === messages.length - 1
+                }
+              />
+            ));
           }
-          setMessages={setMessages}
-          reload={reload}
-          isReadonly={isReadonly}
-          requiresScrollPadding={
-            hasSentMessage && index === messages.length - 1
-          }
-        />
-      ))}
+        }
+
+        // For non-split messages, return a single PreviewMessage
+        return (
+          <PreviewMessage
+            key={message.id}
+            chatId={chatId}
+            message={message}
+            isLoading={status === 'streaming' && messages.length - 1 === index}
+            vote={
+              votes
+                ? votes.find((vote) => vote.messageId === message.id)
+                : undefined
+            }
+            setMessages={setMessages}
+            regenerate={regenerate}
+            isReadonly={isReadonly}
+            requiresScrollPadding={
+              hasSentMessage && index === messages.length - 1
+            }
+          />
+        );
+      })}
 
       {status === 'submitted' &&
         messages.length > 0 &&

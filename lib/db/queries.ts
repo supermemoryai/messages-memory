@@ -304,7 +304,7 @@ export async function saveDocument({
       .values({
         id,
         title,
-        kind,
+        kind: kind as 'text' | 'code' | 'image' | 'sheet',
         content,
         userId,
         createdAt: new Date(),

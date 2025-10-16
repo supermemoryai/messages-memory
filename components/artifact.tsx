@@ -1,6 +1,5 @@
 import type { UIMessage } from 'ai';
-// Note: Attachment type has been changed in AI SDK v5
-type Attachment = { url: string; name: string; contentType: string; };
+import type { Attachment } from '@ai-sdk/ui-utils';
 import { formatDistance } from 'date-fns';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
@@ -67,7 +66,7 @@ function PureArtifact({
   append,
   messages,
   setMessages,
-  reload,
+  regenerate,
   votes,
   isReadonly,
   selectedVisibilityType,
@@ -75,16 +74,16 @@ function PureArtifact({
   chatId: string;
   input: string;
   setInput: (input: string) => void;
-  status: string;
+  status: UseChatHelpers<any>['status'];
   stop: () => void;
   attachments: Array<Attachment>;
   setAttachments: Dispatch<SetStateAction<Array<Attachment>>>;
   messages: Array<UIMessage>;
-  setMessages: (messages: Array<UIMessage>) => void;
+  setMessages: UseChatHelpers<any>['setMessages'];
   votes: Array<Vote> | undefined;
   append: (message: any) => void;
   handleSubmit: () => void;
-  reload: () => void;
+  regenerate: UseChatHelpers<any>['regenerate'];
   isReadonly: boolean;
   selectedVisibilityType: VisibilityType;
 }) {
@@ -322,7 +321,7 @@ function PureArtifact({
                   votes={votes}
                   messages={messages}
                   setMessages={setMessages}
-                  reload={reload}
+                  regenerate={regenerate}
                   isReadonly={isReadonly}
                   artifactStatus={artifact.status}
                 />

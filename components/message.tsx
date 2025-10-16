@@ -27,7 +27,7 @@ const PurePreviewMessage = ({
   vote,
   isLoading,
   setMessages,
-  reload,
+  regenerate,
   isReadonly,
   requiresScrollPadding,
 }: {
@@ -35,8 +35,8 @@ const PurePreviewMessage = ({
   message: UIMessage;
   vote: Vote | undefined;
   isLoading: boolean;
-  setMessages: UseChatHelpers['setMessages'];
-  reload: UseChatHelpers['reload'];
+  setMessages: UseChatHelpers<UIMessage>['setMessages'];
+  regenerate: UseChatHelpers<UIMessage>['regenerate'];
   isReadonly: boolean;
   requiresScrollPadding: boolean;
 }) => {
@@ -74,20 +74,26 @@ const PurePreviewMessage = ({
               'min-h-96': message.role === 'assistant' && requiresScrollPadding,
             })}
           >
-            {message.experimental_attachments &&
-              message.experimental_attachments.length > 0 && (
-                <div
-                  data-testid={`message-attachments`}
-                  className="flex flex-row justify-end gap-2"
-                >
-                  {message.experimental_attachments.map((attachment) => (
+            {message.parts?.filter((part: any) => part.type === 'file').length >
+              0 && (
+              <div
+                data-testid={`message-attachments`}
+                className="flex flex-row justify-end gap-2"
+              >
+                {message.parts
+                  ?.filter((part: any) => part.type === 'file')
+                  .map((part: any) => (
                     <PreviewAttachment
-                      key={attachment.url}
-                      attachment={attachment}
+                      key={part.file.url}
+                      attachment={{
+                        url: part.file.url,
+                        name: part.file.name,
+                        contentType: part.file.type,
+                      }}
                     />
                   ))}
-                </div>
-              )}
+              </div>
+            )}
 
             {message.parts?.map((part, index) => {
               const { type } = part;
@@ -98,7 +104,7 @@ const PurePreviewMessage = ({
                   <MessageReasoning
                     key={key}
                     isLoading={isLoading}
-                    reasoning={part.reasoningText}
+                    reasoningText={(part as any).reasoningText}
                   />
                 );
               }
@@ -144,7 +150,7 @@ const PurePreviewMessage = ({
                       )}
 
                       <div
-                        data-testid="message-content"
+                        data-testid="message-contenxt"
                         className={cn('flex flex-col gap-4', {
                           'bg-primary text-primary-foreground px-3 py-2 rounded-xl':
                             message.role === 'user',
@@ -166,7 +172,7 @@ const PurePreviewMessage = ({
                         message={message}
                         setMode={setMode}
                         setMessages={setMessages}
-                        reload={reload}
+                        regenerate={regenerate}
                       />
                     </div>
                   );
@@ -241,14 +247,15 @@ const PurePreviewMessage = ({
                             setIsSubmitting(true);
 
                             try {
-                              setMessages((messages) => {
+                              setMessages((messages: any) => {
                                 const index = messages.findIndex(
-                                  (m) => m.id === message.id,
+                                  (m: any) => m.id === message.id,
                                 );
                                 if (index !== -1) {
                                   // Remove this message and its corresponding assistant message
                                   return messages.filter(
-                                    (_, i) => i !== index && i !== index + 1,
+                                    (_: any, i: number) =>
+                                      i !== index && i !== index + 1,
                                   );
                                 }
                                 return messages;
@@ -277,11 +284,11 @@ const PurePreviewMessage = ({
               }
 
               if (type === 'tool-invocation') {
-                const { toolInvocation } = part;
-                const { toolName, toolCallId, state } = toolInvocation;
+                const toolPart = part as any;
+                const { toolName, toolCallId, state } = toolPart;
 
                 if (state === 'call') {
-                  const { args } = toolInvocation;
+                  const { args } = toolPart;
 
                   return (
                     <div
@@ -312,7 +319,7 @@ const PurePreviewMessage = ({
                 }
 
                 if (state === 'result') {
-                  const { result } = toolInvocation;
+                  const { result } = toolPart;
 
                   return (
                     <div key={toolCallId}>

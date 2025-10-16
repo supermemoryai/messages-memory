@@ -12,16 +12,18 @@ const components: Partial<Components> = {
     // Check if the paragraph contains only inline content
     // If it contains block elements like pre/code blocks, return a fragment
     const hasBlockElement = React.Children.toArray(children).some(
-      (child) => 
-        React.isValidElement(child) && 
-        typeof child.type !== 'string' && 
-        (child.type === CodeBlock || child.props?.className?.includes('not-prose'))
+      (child) =>
+        React.isValidElement(child) &&
+        typeof child.type !== 'string' &&
+        (child.type === CodeBlock ||
+          // @ts-expect-error
+          child.props?.className?.includes('not-prose')),
     );
-    
+
     if (hasBlockElement) {
       return <>{children}</>;
     }
-    
+
     return <p {...props}>{children}</p>;
   },
   ol: ({ node, children, ...props }) => {

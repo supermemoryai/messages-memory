@@ -23,6 +23,7 @@ type ArtifactAction<M = any> = {
 };
 
 export type ArtifactToolbarContext = {
+  // @ts-ignore
   appendMessage: UseChatHelpers['append'];
 };
 

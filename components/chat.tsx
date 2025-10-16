@@ -1,8 +1,10 @@
 'use client';
 
-import type { Attachment, UIMessage } from 'ai';
+import type { UIMessage } from 'ai';
+import { DefaultChatTransport } from 'ai';
+import type { Attachment } from '@ai-sdk/ui-utils';
 import { useChat } from '@ai-sdk/react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import useSWR, { useSWRConfig } from 'swr';
 import { ChatHeader } from '@/components/chat-header';
 import type { Vote } from '@/lib/db/schema';
@@ -38,6 +40,10 @@ export function Chat({
   session: Session;
   autoResume: boolean;
 }) {
+  console.log(
+    '[CHAT] Component rendered with initialMessages:',
+    initialMessages.length,
+  );
   const { mutate } = useSWRConfig();
 
   const { visibilityType } = useChatVisibility({
@@ -50,36 +56,36 @@ export function Chat({
   const {
     messages,
     setMessages,
-    handleSubmit,
-    setInput,
-    append,
+    sendMessage,
     status,
     stop,
-    reload,
-    experimental_resume,
-    data
+    regenerate,
+    resumeStream,
   } = useChat({
     id,
-    initialMessages,
-    api: '/api/chat', // Explicitly set the API endpoint
+    messages: initialMessages,
     experimental_throttle: 100,
     generateId: generateUUID,
-    fetch: fetchWithErrorHandlers,
+    transport: new DefaultChatTransport({
+      api: '/api/chat',
+      fetch: fetchWithErrorHandlers,
+      prepareSendMessagesRequest({ messages }) {
+        return {
+          body: {
+            id,
+            message: messages.at(-1),
+            selectedChatModel: initialChatModel,
+            selectedVisibilityType: visibilityType,
+          },
+        };
+      },
+    }),
 
-    experimental_prepareRequestBody: (body) => {
-      return {
-        id,
-        message: body.messages.at(-1),
-        selectedChatModel: initialChatModel,
-        selectedVisibilityType: visibilityType,
-      };
-    },
-
-    onFinish: (_, { usage }) => {
+    onFinish: () => {
       mutate(unstable_serialize(getChatHistoryPaginationKey));
 
       // Disabled message eviction for now
-      // const totalTokens = usage.totalTokens || 0;
+      // const totalTokens = usage?.totalTokens || 0;
       // console.log('totalTokens in chat.tsx', totalTokens);
       // if (totalTokens > 10000) {
       //   console.log('deleting oldest message in chat.tsx');
@@ -94,8 +100,20 @@ export function Chat({
           description: error.message,
         });
       }
-    }
+    },
   });
+
+  const handleSubmit = (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (!input.trim()) return;
+
+    sendMessage({ text: input });
+    setInput('');
+  };
+
+  const append = (message: { role: 'user'; content: string }) => {
+    sendMessage({ text: message.content });
+  };
 
   const searchParams = useSearchParams();
   const query = searchParams.get('query');
@@ -111,7 +129,7 @@ export function Chat({
 
       setHasAppendedQuery(true);
     }
-  }, [query, append, hasAppendedQuery, id]);
+  }, [query, hasAppendedQuery, id]);
 
   const { data: votes } = useSWR<Array<Vote>>(
     messages.length >= 2 ? `/api/vote?chatId=${id}` : null,
@@ -124,8 +142,7 @@ export function Chat({
   useAutoResume({
     autoResume,
     initialMessages,
-    experimental_resume,
-    data,
+    resumeStream,
     setMessages,
   });
 
@@ -147,7 +164,7 @@ export function Chat({
           votes={votes}
           messages={messages}
           setMessages={setMessages}
-          reload={reload}
+          regenerate={regenerate}
           isReadonly={isReadonly}
           isArtifactVisible={isArtifactVisible}
         />
@@ -184,7 +201,7 @@ export function Chat({
         append={append}
         messages={messages}
         setMessages={setMessages}
-        reload={reload}
+        regenerate={regenerate}
         votes={votes}
         isReadonly={isReadonly}
         selectedVisibilityType={visibilityType}

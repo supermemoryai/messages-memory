@@ -1,6 +1,7 @@
 'use client';
 
-import type { Attachment, UIMessage } from 'ai';
+import type { UIMessage } from 'ai';
+import type { Attachment } from '@ai-sdk/ui-utils';
 import cx from 'classnames';
 import type React from 'react';
 import {
@@ -43,16 +44,16 @@ function PureMultimodalInput({
   selectedVisibilityType,
 }: {
   chatId: string;
-  input: UseChatHelpers['input'];
-  setInput: UseChatHelpers['setInput'];
-  status: UseChatHelpers['status'];
+  input: string;
+  setInput: (input: string) => void;
+  status: UseChatHelpers<UIMessage>['status'];
   stop: () => void;
   attachments: Array<Attachment>;
   setAttachments: Dispatch<SetStateAction<Array<Attachment>>>;
   messages: Array<UIMessage>;
-  setMessages: UseChatHelpers['setMessages'];
-  append: UseChatHelpers['append'];
-  handleSubmit: UseChatHelpers['handleSubmit'];
+  setMessages: UseChatHelpers<UIMessage>['setMessages'];
+  append: (message: any) => void;
+  handleSubmit: (e?: React.FormEvent) => void;
   className?: string;
   selectedVisibilityType: VisibilityType;
 }) {
@@ -403,7 +404,7 @@ function PureAttachmentsButton({
   status,
 }: {
   fileInputRef: React.MutableRefObject<HTMLInputElement | null>;
-  status: UseChatHelpers['status'];
+  status: UseChatHelpers<UIMessage>['status'];
 }) {
   return (
     <Button
@@ -428,7 +429,7 @@ function PureStopButton({
   setMessages,
 }: {
   stop: () => void;
-  setMessages: UseChatHelpers['setMessages'];
+  setMessages: UseChatHelpers<UIMessage>['setMessages'];
 }) {
   return (
     <Button
@@ -437,7 +438,7 @@ function PureStopButton({
       onClick={(event) => {
         event.preventDefault();
         stop();
-        setMessages((messages) => messages);
+        setMessages((messages: any) => messages);
       }}
     >
       <StopIcon size={14} />

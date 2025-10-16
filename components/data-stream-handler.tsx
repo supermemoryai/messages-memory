@@ -22,16 +22,28 @@ export type DataStreamDelta = {
 };
 
 export function DataStreamHandler({ id }: { id: string }) {
-  const { data: dataStream } = useChat({ id });
+  const { messages } = useChat({ id });
   const { artifact, setArtifact, setMetadata } = useArtifact();
   const lastProcessedIndex = useRef(-1);
 
   useEffect(() => {
-    if (!dataStream?.length) return;
+    if (!messages?.length) return;
 
-    const newDeltas = dataStream.slice(lastProcessedIndex.current + 1);
-    lastProcessedIndex.current = dataStream.length - 1;
+    // Extract data parts from the latest message
+    const latestMessage = messages[messages.length - 1];
+    if (!latestMessage?.parts) return;
 
+    const dataParts = latestMessage.parts.filter((part: any) =>
+      part.type.startsWith('data-'),
+    );
+
+    if (!dataParts.length) return;
+
+    // Process new data parts
+    const newDeltas = dataParts.slice(lastProcessedIndex.current + 1);
+    lastProcessedIndex.current = dataParts.length - 1;
+
+    // @ts-ignore
     (newDeltas as DataStreamDelta[]).forEach((delta: DataStreamDelta) => {
       const artifactDefinition = artifactDefinitions.find(
         (artifactDefinition) => artifactDefinition.kind === artifact.kind,
@@ -90,7 +102,7 @@ export function DataStreamHandler({ id }: { id: string }) {
         }
       });
     });
-  }, [dataStream, setArtifact, setMetadata, artifact]);
+  }, [messages, setArtifact, setMetadata, artifact]);
 
   return null;
 }

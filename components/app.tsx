@@ -1,16 +1,20 @@
-"use client";
+'use client';
 
-import { Sidebar } from "./sidebar";
-import { ChatArea } from "./chat-area";
-import { useState, useEffect, useRef, useCallback } from "react";
-import { Nav } from "./nav";
-import type { Conversation, Message, Reaction, Attachment } from "../types";
-import { generateUUID } from "@/lib/utils";
-import { createInitialConversationsForUser, getUserSpecificSupermemoryId, getUserSpecificProfileId } from "../data/initial-conversations";
-import { MessageQueue } from "../lib/message-queue";
-import { useToast } from "@/hooks/use-toast";
-import { CommandMenu } from "./command-menu";
-import { soundEffects } from "@/lib/sound-effects";
+import { Sidebar } from './sidebar';
+import { ChatArea } from './chat-area';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { Nav } from './nav';
+import type { Conversation, Message, Reaction, Attachment } from '../types';
+import { generateUUID } from '@/lib/utils';
+import {
+  createInitialConversationsForUser,
+  getUserSpecificSupermemoryId,
+  getUserSpecificProfileId,
+} from '../data/initial-conversations';
+import { MessageQueue } from '../lib/message-queue';
+import { useToast } from '@/hooks/use-toast';
+import { CommandMenu } from './command-menu';
+import { soundEffects } from '@/lib/sound-effects';
 
 export default function App() {
   // State
@@ -18,23 +22,23 @@ export default function App() {
   const [isNewConversation, setIsNewConversation] = useState(false);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversation, setActiveConversation] = useState<string | null>(
-    null
+    null,
   );
   const [userId, setUserId] = useState<string | null>(null);
   const [lastActiveConversation, setLastActiveConversation] = useState<
     string | null
   >(null);
   const [messageDrafts, setMessageDrafts] = useState<Record<string, string>>(
-    {}
+    {},
   );
-  const [recipientInput, setRecipientInput] = useState("");
+  const [recipientInput, setRecipientInput] = useState('');
   const [isMobileView, setIsMobileView] = useState(false);
   const [isLayoutInitialized, setIsLayoutInitialized] = useState(false);
   const [typingStatus, setTypingStatus] = useState<{
     conversationId: string;
     recipient: string;
   } | null>(null);
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchTerm, setSearchTerm] = useState('');
   const [isCommandMenuOpen, setIsCommandMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(soundEffects.isEnabled());
@@ -43,8 +47,8 @@ export default function App() {
   // Add command menu ref
   const commandMenuRef = useRef<{ setOpen: (open: boolean) => void }>(null);
 
-  const STORAGE_KEY = "supermemoryConversations";
-  const CHAT_ID_KEY = "supermemoryCurrentChatId";
+  const STORAGE_KEY = 'supermemoryConversations';
+  const CHAT_ID_KEY = 'supermemoryCurrentChatId';
 
   // Memoized conversation selection method
   const selectConversation = useCallback(
@@ -52,13 +56,13 @@ export default function App() {
       // If clearing the selection
       if (conversationId === null) {
         setActiveConversation(null);
-        window.history.pushState({}, "", "/");
+        window.history.pushState({}, '', '/');
         return;
       }
 
       // Find the conversation in the list
       const selectedConversation = conversations.find(
-        (conversation) => conversation.id === conversationId
+        (conversation) => conversation.id === conversationId,
       );
 
       // If conversation is not found, handle gracefully
@@ -66,12 +70,12 @@ export default function App() {
         console.warn(`Conversation with ID ${conversationId} not found`);
 
         // Clear URL and select first available conversation
-        window.history.pushState({}, "", "/");
+        window.history.pushState({}, '', '/');
 
         if (conversations.length > 0) {
           const fallbackConversation = conversations[0];
           setActiveConversation(fallbackConversation.id);
-          window.history.pushState({}, "", `?id=${fallbackConversation.id}`);
+          window.history.pushState({}, '', `?id=${fallbackConversation.id}`);
         } else {
           setActiveConversation(null);
         }
@@ -81,9 +85,9 @@ export default function App() {
       // Successfully select the conversation
       setActiveConversation(conversationId);
       setIsNewConversation(false);
-      window.history.pushState({}, "", `?id=${conversationId}`);
+      window.history.pushState({}, '', `?id=${conversationId}`);
     },
-    [conversations, setActiveConversation, setIsNewConversation]
+    [conversations, setActiveConversation, setIsNewConversation],
   );
 
   // Effects
@@ -94,8 +98,8 @@ export default function App() {
       !conversations.some((c) => c.id === activeConversation)
     ) {
       console.error(
-        "Active conversation no longer exists:",
-        activeConversation
+        'Active conversation no longer exists:',
+        activeConversation,
       );
 
       // If current active conversation no longer exists
@@ -132,7 +136,7 @@ export default function App() {
         console.error('Error fetching user profile for initialization:', error);
       }
     };
-    
+
     fetchUserId();
   }, []); // Run only once on mount
 
@@ -142,13 +146,13 @@ export default function App() {
       const response = await fetch('/api/profile');
       if (response.ok) {
         const { profile } = await response.json();
-        
+
         // Set the user ID for use throughout the app
         setUserId(profile.userId);
-        
+
         // Show container tag and static/dynamic profile data with proper labels
         let profileContent = `**Container Tag:**\n${profile.userId}\n\n`;
-        
+
         // Show static profile data
         if (profile.static && profile.static.length > 0) {
           profileContent += `**Static:**\n`;
@@ -156,19 +160,19 @@ export default function App() {
             profileContent += `• ${item}\n\n`;
           });
         }
-        
-        // Show dynamic profile data  
+
+        // Show dynamic profile data
         if (profile.dynamic && profile.dynamic.length > 0) {
           profileContent += `**Dynamic:**\n`;
           profile.dynamic.forEach((item: any) => {
             profileContent += `• ${item}\n\n`;
           });
         }
-        
+
         if (!profile.static?.length && !profile.dynamic?.length) {
           profileContent += `**Static:**\n(empty)\n\n**Dynamic:**\n(empty)`;
         }
-        
+
         // Update the profile chat with the new profile content
         const userProfileChatId = getUserSpecificProfileId(profile.userId);
         setConversations((prev) =>
@@ -178,13 +182,13 @@ export default function App() {
                 ...conv,
                 messages: [
                   {
-                    id: getUserSpecificProfileId(profile.userId) + '-question',
+                    id: `${getUserSpecificProfileId(profile.userId)}-question`,
                     content: 'who am i',
                     sender: 'me',
                     timestamp: new Date(Date.now() - 60000).toISOString(),
                   },
                   {
-                    id: getUserSpecificProfileId(profile.userId) + '-response',
+                    id: `${getUserSpecificProfileId(profile.userId)}-response`,
                     content: profileContent,
                     sender: 'Profile',
                     timestamp: new Date().toISOString(),
@@ -194,7 +198,7 @@ export default function App() {
               };
             }
             return conv;
-          })
+          }),
         );
       }
     } catch (error) {
@@ -205,13 +209,13 @@ export default function App() {
   // Fetch profile every time profile chat becomes active
   // Track if we just switched to the profile chat
   const [lastProfileChatView, setLastProfileChatView] = useState<number>(0);
-  
+
   useEffect(() => {
     if (userId && activeConversation === getUserSpecificProfileId(userId)) {
       // Always fetch when switching to profile chat
       updateProfileChat();
       setLastProfileChatView(Date.now());
-      
+
       // Auto-refresh every 30 seconds while viewing profile
       const interval = setInterval(updateProfileChat, 30000);
       return () => clearInterval(interval);
@@ -221,29 +225,30 @@ export default function App() {
   // Function to trigger automatic profile refresh after Supermemory responses
   const triggerProfileRefresh = useCallback(() => {
     if (!userId) return;
-    
+
     setPendingProfileRefresh(true);
-    
+
     // Show notification that profile will be updated
     toast({
-      description: "Updating your profile with new information...",
+      description: 'Updating your profile with new information...',
     });
-    
+
     // Wait 10 seconds then refresh profile
     setTimeout(() => {
-      updateProfileChat().then(() => {
-        setPendingProfileRefresh(false);
-        toast({
-          description: "Profile updated with latest information!",
+      updateProfileChat()
+        .then(() => {
+          setPendingProfileRefresh(false);
+          toast({
+            description: 'Profile updated with latest information!',
+          });
+        })
+        .catch((error) => {
+          console.error('Error updating profile:', error);
+          setPendingProfileRefresh(false);
+          toast({
+            description: 'Profile update completed.',
+          });
         });
-      }).catch((error) => {
-        console.error('Error updating profile:', error);
-        setPendingProfileRefresh(false);
-        toast({
-          description: "Profile update completed.",
-          variant: "default"
-        });
-      });
     }, 10000); // 10 second delay
   }, [userId, updateProfileChat, toast]);
 
@@ -258,7 +263,7 @@ export default function App() {
         if (!newIsMobileView && !activeConversation && lastActiveConversation) {
           // Verify that the lastActiveConversation still exists before selecting it
           const conversationExists = conversations.some(
-            (c) => c.id === lastActiveConversation
+            (c) => c.id === lastActiveConversation,
           );
           if (conversationExists) {
             selectConversation(lastActiveConversation);
@@ -275,8 +280,8 @@ export default function App() {
 
     handleResize();
     setIsLayoutInitialized(true);
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, [
     isMobileView,
     activeConversation,
@@ -288,15 +293,15 @@ export default function App() {
   // Get conversations from local storage (only after userId is available)
   useEffect(() => {
     if (!userId) return; // Wait for userId to be set
-    
+
     const initializeConversations = async () => {
       const saved = localStorage.getItem(STORAGE_KEY);
       const urlParams = new URLSearchParams(window.location.search);
-      const urlConversationId = urlParams.get("id");
+      const urlConversationId = urlParams.get('id');
 
       // Get or generate the chat ID for this user
       let chatId: string = localStorage.getItem(CHAT_ID_KEY) || '';
-      
+
       // Try to fetch existing chats from API if we don't have a stored ID
       if (!chatId) {
         try {
@@ -312,110 +317,116 @@ export default function App() {
           console.error('Error fetching chat history:', error);
         }
       }
-      
+
       // If still no chat ID, generate a new one
       if (!chatId) {
         chatId = generateUUID();
       }
-      
+
       // Store the final chat ID
       localStorage.setItem(CHAT_ID_KEY, chatId);
 
       // Start with initial conversations using user-specific IDs
       const initialConversations = createInitialConversationsForUser(userId);
       const userSupermemoryId = getUserSpecificSupermemoryId(userId);
-      
-      let allConversations = initialConversations.map(conv => 
-        conv.id === userSupermemoryId 
-          ? { ...conv, id: chatId }
-          : conv
+
+      let allConversations = initialConversations.map((conv) =>
+        conv.id === userSupermemoryId ? { ...conv, id: chatId } : conv,
       );
 
-    if (saved) {
-      try {
-        // Load saved conversations
-        const parsedConversations = JSON.parse(saved);
+      if (saved) {
+        try {
+          // Load saved conversations
+          const parsedConversations = JSON.parse(saved);
 
-        if (!Array.isArray(parsedConversations)) {
-          console.error("Invalid conversations format in localStorage");
+          if (!Array.isArray(parsedConversations)) {
+            console.error('Invalid conversations format in localStorage');
+            return;
+          }
+
+          // Migration: Update old IDs to the current user's chat ID
+          const migratedConversations = parsedConversations.map((conv) => {
+            if (
+              conv.id === 'supermemory-chat' ||
+              conv.id === userSupermemoryId
+            ) {
+              return { ...conv, id: chatId };
+            }
+            return conv;
+          });
+
+          // Create a map of initial conversation IDs for faster lookup
+          const initialIds = new Set([
+            chatId,
+            ...initialConversations.map((conv) => conv.id),
+          ]);
+
+          // Separate user-created and modified initial conversations
+          const userConversations = [];
+          const modifiedInitialConversations = new Map();
+
+          for (const savedConv of migratedConversations) {
+            if (initialIds.has(savedConv.id)) {
+              modifiedInitialConversations.set(savedConv.id, savedConv);
+            } else {
+              userConversations.push(savedConv);
+            }
+          }
+
+          // Update initial conversations with saved changes
+          allConversations = allConversations.map((conv) =>
+            modifiedInitialConversations.has(conv.id)
+              ? modifiedInitialConversations.get(conv.id)
+              : conv,
+          );
+
+          // Add user-created conversations
+          allConversations = [...allConversations, ...userConversations];
+        } catch (error) {
+          console.error('Error parsing saved conversations:', error);
+        }
+      }
+
+      // Set conversations first
+      setConversations(allConversations);
+
+      // Handle conversation selection after setting conversations
+      if (urlConversationId) {
+        // Migration: Update URL if it has the old ID
+        const migratedUrlId =
+          urlConversationId === 'supermemory-chat' ||
+          urlConversationId === getUserSpecificSupermemoryId(userId)
+            ? chatId
+            : urlConversationId;
+
+        // Check if the URL conversation exists
+        const conversationExists = allConversations.some(
+          (c) => c.id === migratedUrlId,
+        );
+        if (conversationExists) {
+          // If it exists, select it
+          setActiveConversation(migratedUrlId);
+          // Update URL if it was migrated
+          if (migratedUrlId !== urlConversationId) {
+            window.history.pushState({}, '', `?id=${migratedUrlId}`);
+          }
           return;
         }
-
-        // Migration: Update old IDs to the current user's chat ID
-        const migratedConversations = parsedConversations.map((conv) => {
-          if (conv.id === "supermemory-chat" || conv.id === userSupermemoryId) {
-            return { ...conv, id: chatId };
-          }
-          return conv;
-        });
-
-        // Create a map of initial conversation IDs for faster lookup
-        const initialIds = new Set([chatId, ...initialConversations.map((conv) => conv.id)]);
-
-        // Separate user-created and modified initial conversations
-        const userConversations = [];
-        const modifiedInitialConversations = new Map();
-
-        for (const savedConv of migratedConversations) {
-          if (initialIds.has(savedConv.id)) {
-            modifiedInitialConversations.set(savedConv.id, savedConv);
-          } else {
-            userConversations.push(savedConv);
-          }
-        }
-
-        // Update initial conversations with saved changes
-        allConversations = allConversations.map((conv) =>
-          modifiedInitialConversations.has(conv.id)
-            ? modifiedInitialConversations.get(conv.id)
-            : conv
-        );
-
-        // Add user-created conversations
-        allConversations = [...allConversations, ...userConversations];
-      } catch (error) {
-        console.error("Error parsing saved conversations:", error);
       }
-    }
 
-    // Set conversations first
-    setConversations(allConversations);
-
-    // Handle conversation selection after setting conversations
-    if (urlConversationId) {
-      // Migration: Update URL if it has the old ID
-      const migratedUrlId = (urlConversationId === "supermemory-chat" || urlConversationId === getUserSpecificSupermemoryId(userId))
-        ? chatId
-        : urlConversationId;
-      
-      // Check if the URL conversation exists
-      const conversationExists = allConversations.some(
-        (c) => c.id === migratedUrlId
-      );
-      if (conversationExists) {
-        // If it exists, select it
-        setActiveConversation(migratedUrlId);
-        // Update URL if it was migrated
-        if (migratedUrlId !== urlConversationId) {
-          window.history.pushState({}, "", `?id=${migratedUrlId}`);
-        }
+      // If mobile view, show the sidebar
+      if (isMobileView) {
+        window.history.pushState({}, '', '/');
+        setActiveConversation(null);
         return;
       }
-    }
 
-    // If mobile view, show the sidebar
-    if (isMobileView) {
-      window.history.pushState({}, "", "/");
-      setActiveConversation(null);
-      return;
-    }
-
-    // No URL ID or invalid ID, and not mobile - select first conversation
-    if (allConversations.length > 0) {
-      setActiveConversation(allConversations[0].id);
-    }
+      // No URL ID or invalid ID, and not mobile - select first conversation
+      if (allConversations.length > 0) {
+        setActiveConversation(allConversations[0].id);
+      }
     };
-    
+
     // Call the async initialization function
     initializeConversations();
   }, [userId, isMobileView]); // Add userId as dependency
@@ -444,14 +455,14 @@ export default function App() {
 
           const conversation = prev.find((c) => c.id === conversationId);
           if (!conversation) {
-            console.error("Conversation not found:", conversationId);
+            console.error('Conversation not found:', conversationId);
             return prev;
           }
 
           // Use MessageQueue's tracked active conversation state to determine unread status
           const shouldIncrementUnread =
             conversationId !== currentActiveConversation &&
-            message.sender !== "me" &&
+            message.sender !== 'me' &&
             !conversation.hideAlerts;
 
           // Play received sound if message is in inactive conversation, not from us, and alerts aren't hidden
@@ -460,9 +471,11 @@ export default function App() {
           }
 
           // Trigger profile refresh for Supermemory responses (not from user, not in profile chat)
-          const isSupermemoryChat = userId && conversationId === getUserSpecificSupermemoryId(userId);
-          const isProfileChat = userId && conversationId === getUserSpecificProfileId(userId);
-          
+          const isSupermemoryChat =
+            userId && conversationId === getUserSpecificSupermemoryId(userId);
+          const isProfileChat =
+            userId && conversationId === getUserSpecificProfileId(userId);
+
           console.log('[Profile Refresh Debug]', {
             conversationId,
             userId,
@@ -472,10 +485,19 @@ export default function App() {
             isProfileChat,
             messageSender: message.sender,
             pendingProfileRefresh,
-            shouldTrigger: isSupermemoryChat && message.sender !== "me" && !isProfileChat && !pendingProfileRefresh
+            shouldTrigger:
+              isSupermemoryChat &&
+              message.sender !== 'me' &&
+              !isProfileChat &&
+              !pendingProfileRefresh,
           });
-          
-          if (isSupermemoryChat && message.sender !== "me" && !isProfileChat && !pendingProfileRefresh) {
+
+          if (
+            isSupermemoryChat &&
+            message.sender !== 'me' &&
+            !isProfileChat &&
+            !pendingProfileRefresh
+          ) {
             console.log('[Profile Refresh] Triggering profile refresh...');
             triggerProfileRefresh();
           }
@@ -490,14 +512,14 @@ export default function App() {
                     ? (conv.unreadCount || 0) + 1
                     : conv.unreadCount,
                 }
-              : conv
+              : conv,
           );
         });
       },
       onMessageUpdated: (
         conversationId: string,
         messageId: string,
-        updates: Partial<Message>
+        updates: Partial<Message>,
       ) => {
         setConversations((prev) => {
           const currentActiveConversation =
@@ -525,8 +547,8 @@ export default function App() {
                           !currentReactions.some(
                             (currentReaction) =>
                               currentReaction.type === newReaction.type &&
-                              currentReaction.sender === newReaction.sender
-                          )
+                              currentReaction.sender === newReaction.sender,
+                          ),
                       );
                       return {
                         ...msg,
@@ -537,13 +559,13 @@ export default function App() {
                     return msg;
                   }),
                 }
-              : conv
+              : conv,
           );
         });
       },
       onTypingStatusChange: (
         conversationId: string | null,
-        recipient: string | null
+        recipient: string | null,
       ) => {
         if (!conversationId || !recipient) {
           setTypingStatus(null);
@@ -552,10 +574,10 @@ export default function App() {
         }
       },
       onError: (error: Error) => {
-        console.error("Error generating message:", error);
+        console.error('Error generating message:', error);
         setTypingStatus(null);
       },
-    })
+    }),
   );
 
   // Update sound enabled state when it changes in soundEffects
@@ -569,15 +591,15 @@ export default function App() {
       prev.map((conversation) =>
         conversation.id === conversationId
           ? { ...conversation, unreadCount: 0 }
-          : conversation
-      )
+          : conversation,
+      ),
     );
   };
 
   // Method to handle message draft changes
   const handleMessageDraftChange = (
     conversationId: string,
-    message: string
+    message: string,
   ) => {
     setMessageDrafts((prev) => ({
       ...prev,
@@ -596,26 +618,32 @@ export default function App() {
 
   // Method to extract plain text from HTML content while preserving mentions
   const extractMessageContent = (htmlContent: string): string => {
-    const temp = document.createElement("div");
+    const temp = document.createElement('div');
     temp.innerHTML = htmlContent;
-    return temp.textContent || "";
+    return temp.textContent || '';
   };
 
   // Method to handle message sending
   const handleSendMessage = async (
     messageHtml: string,
     conversationId?: string,
-    attachments?: Attachment[]
+    attachments?: Attachment[],
   ) => {
     const messageText = extractMessageContent(messageHtml);
-    if (!messageText.trim() && (!attachments || attachments.length === 0)) return;
+    if (!messageText.trim() && (!attachments || attachments.length === 0))
+      return;
 
     // Use the provided conversationId, or default to the main Supermemory chat
-    const targetConversationId = conversationId || getUserSpecificSupermemoryId(userId || '');
-    const conversation = conversations.find((c) => c.id === targetConversationId);
-    
+    const targetConversationId =
+      conversationId || getUserSpecificSupermemoryId(userId || '');
+    const conversation = conversations.find(
+      (c) => c.id === targetConversationId,
+    );
+
     if (!conversation) {
-      console.error(`Conversation with ID ${targetConversationId} not found. Skipping message.`);
+      console.error(
+        `Conversation with ID ${targetConversationId} not found. Skipping message.`,
+      );
       return;
     }
 
@@ -624,7 +652,7 @@ export default function App() {
       id: generateUUID(),
       content: messageText,
       htmlContent: messageHtml,
-      sender: "me",
+      sender: 'me',
       timestamp: new Date().toISOString(),
       ...(attachments && attachments.length > 0 && { attachments }),
     };
@@ -639,7 +667,7 @@ export default function App() {
 
     setConversations((prev) => {
       const updatedConversations = prev.map((c) =>
-        c.id === targetConversationId ? updatedConversation : c
+        c.id === targetConversationId ? updatedConversation : c,
       );
       localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedConversations));
       return updatedConversations;
@@ -647,7 +675,7 @@ export default function App() {
 
     setActiveConversation(targetConversationId);
     setIsNewConversation(false);
-    window.history.pushState({}, "", `?id=${targetConversationId}`);
+    window.history.pushState({}, '', `?id=${targetConversationId}`);
     messageQueue.current.enqueueUserMessage(updatedConversation);
     clearMessageDraft(targetConversationId);
   };
@@ -657,7 +685,7 @@ export default function App() {
     // Don't allow deleting the Supermemory conversation
     if (id === getUserSpecificSupermemoryId(userId || '')) {
       toast({
-        description: "Cannot delete the Supermemory conversation",
+        description: 'Cannot delete the Supermemory conversation',
       });
       return;
     }
@@ -669,7 +697,7 @@ export default function App() {
 
     setConversations((prevConversations) => {
       const newConversations = prevConversations.filter(
-        (conv) => conv.id !== id
+        (conv) => conv.id !== id,
       );
 
       // Save to localStorage
@@ -688,32 +716,32 @@ export default function App() {
 
     // Show toast notification
     toast({
-      description: "Conversation deleted",
+      description: 'Conversation deleted',
     });
   };
 
   // Method to handle conversation pin/unpin
   const handleUpdateConversation = (
     conversations: Conversation[],
-    updateType?: "pin" | "mute"
+    updateType?: 'pin' | 'mute',
   ) => {
     const updatedConversation = conversations.find(
-      (conv) => conv.id === activeConversation
+      (conv) => conv.id === activeConversation,
     );
     setConversations(conversations);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(conversations));
 
     // Show toast notification
     if (updatedConversation) {
-      let toastMessage = "";
-      if (updateType === "pin") {
+      let toastMessage = '';
+      if (updateType === 'pin') {
         toastMessage = updatedConversation.pinned
-          ? "Conversation pinned"
-          : "Conversation unpinned";
-      } else if (updateType === "mute") {
+          ? 'Conversation pinned'
+          : 'Conversation unpinned';
+      } else if (updateType === 'mute') {
         toastMessage = updatedConversation.hideAlerts
-          ? "Conversation muted"
-          : "Conversation unmuted";
+          ? 'Conversation muted'
+          : 'Conversation unmuted';
       }
       if (toastMessage) {
         toast({
@@ -732,22 +760,28 @@ export default function App() {
             if (message.id === messageId) {
               // Check if this exact reaction already exists
               const existingReaction = message.reactions?.find(
-                (r) => r.sender === reaction.sender && r.type === reaction.type
+                (r) => r.sender === reaction.sender && r.type === reaction.type,
               );
 
               if (existingReaction) {
                 // If the same reaction exists, remove it
                 return {
                   ...message,
-                  reactions: message.reactions?.filter(
-                    (r) => !(r.sender === reaction.sender && r.type === reaction.type)
-                  ) || [],
+                  reactions:
+                    message.reactions?.filter(
+                      (r) =>
+                        !(
+                          r.sender === reaction.sender &&
+                          r.type === reaction.type
+                        ),
+                    ) || [],
                 };
               } else {
                 // Remove any other reaction from this sender and add the new one
-                const otherReactions = message.reactions?.filter(
-                  (r) => r.sender !== reaction.sender
-                ) || [];
+                const otherReactions =
+                  message.reactions?.filter(
+                    (r) => r.sender !== reaction.sender,
+                  ) || [];
                 return {
                   ...message,
                   reactions: [...otherReactions, reaction],
@@ -764,7 +798,7 @@ export default function App() {
         });
       });
     },
-    []
+    [],
   );
 
   // Method to update conversation name
@@ -772,11 +806,11 @@ export default function App() {
     (name: string) => {
       setConversations((prevConversations) => {
         return prevConversations.map((conv) =>
-          conv.id === activeConversation ? { ...conv, name } : conv
+          conv.id === activeConversation ? { ...conv, name } : conv,
         );
       });
     },
-    [activeConversation]
+    [activeConversation],
   );
 
   // Method to handle hide alerts toggle
@@ -784,11 +818,11 @@ export default function App() {
     (hide: boolean) => {
       setConversations((prevConversations) =>
         prevConversations.map((conv) =>
-          conv.id === activeConversation ? { ...conv, hideAlerts: hide } : conv
-        )
+          conv.id === activeConversation ? { ...conv, hideAlerts: hide } : conv,
+        ),
       );
     },
-    [activeConversation]
+    [activeConversation],
   );
 
   // Method to handle clearing chat
@@ -797,27 +831,27 @@ export default function App() {
 
     // Generate a new chat ID for the fresh start
     const newChatId = generateUUID();
-    
+
     // Update localStorage with the new chat ID
     localStorage.setItem(CHAT_ID_KEY, newChatId);
-    
+
     // Update the conversation with new ID and cleared messages
     setConversations((prevConversations) =>
       prevConversations.map((conv) =>
-        conv.id === activeConversation 
-          ? { 
-              ...conv, 
+        conv.id === activeConversation
+          ? {
+              ...conv,
               id: newChatId,
               messages: [],
-              lastMessageTime: new Date().toISOString()
-            } 
-          : conv
-      )
+              lastMessageTime: new Date().toISOString(),
+            }
+          : conv,
+      ),
     );
-    
+
     // Update active conversation to the new ID
     setActiveConversation(newChatId);
-    
+
     // Update the URL to reflect the new chat ID
     window.history.pushState({}, '', `?id=${newChatId}`);
   }, [activeConversation]);
@@ -847,7 +881,7 @@ export default function App() {
         onNewChat={() => {
           setIsNewConversation(true);
           setActiveConversation(null);
-          window.history.pushState({}, "", "/");
+          window.history.pushState({}, '', '/');
         }}
         onSelectConversation={selectConversation}
         onDeleteConversation={handleDeleteConversation}
@@ -861,8 +895,8 @@ export default function App() {
           <div
             className={`h-full w-full sm:w-[320px] flex-shrink-0 ${
               isMobileView && (activeConversation || isNewConversation)
-                ? "hidden"
-                : "block sm:border-r dark:border-foreground/20"
+                ? 'hidden'
+                : 'block sm:border-r dark:border-foreground/20'
             }`}
           >
             <Sidebar
@@ -885,8 +919,8 @@ export default function App() {
                 onNewChat={() => {
                   setIsNewConversation(true);
                   selectConversation(null);
-                  setRecipientInput("");
-                  handleMessageDraftChange("new", "");
+                  setRecipientInput('');
+                  handleMessageDraftChange('new', '');
                 }}
                 isMobileView={isMobileView}
                 isScrolled={isScrolled}
@@ -896,8 +930,8 @@ export default function App() {
           <div
             className={`flex-1 h-full ${
               isMobileView && !activeConversation && !isNewConversation
-                ? "hidden"
-                : "block"
+                ? 'hidden'
+                : 'block'
             }`}
           >
             <ChatArea
@@ -917,18 +951,22 @@ export default function App() {
               onSendMessage={handleSendMessage}
               onReaction={handleReaction}
               typingStatus={typingStatus}
-              conversationId={activeConversation || ""}
+              conversationId={activeConversation || ''}
               onUpdateConversationName={handleUpdateConversationName}
               onHideAlertsChange={handleHideAlertsChange}
               onClearChat={handleClearChat}
               messageDraft={
                 isNewConversation
-                  ? messageDrafts.new || ""
-                  : messageDrafts[activeConversation || ""] || ""
+                  ? messageDrafts.new || ''
+                  : messageDrafts[activeConversation || ''] || ''
               }
               onMessageDraftChange={handleMessageDraftChange}
               unreadCount={totalUnreadCount}
-              isReadOnly={userId ? activeConversation === getUserSpecificProfileId(userId) : false}
+              isReadOnly={
+                userId
+                  ? activeConversation === getUserSpecificProfileId(userId)
+                  : false
+              }
               userId={userId || undefined}
             />
           </div>

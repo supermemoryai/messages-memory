@@ -89,7 +89,7 @@ export function DocumentPreview({
     : artifact.status === 'streaming'
       ? {
           title: artifact.title,
-          kind: artifact.kind,
+          kind: artifact.kind as 'text' | 'code' | 'image' | 'sheet',
           content: artifact.content,
           id: artifact.documentId,
           createdAt: new Date(),

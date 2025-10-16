@@ -1,5 +1,5 @@
-import type { Conversation } from "../types";
-import { createHash } from "crypto";
+import type { Conversation } from '../types';
+import { createHash } from 'node:crypto';
 
 // Helper function to create a timestamp for a specific time ago
 const getTimeAgo = (minutes: number) => {
@@ -17,17 +17,25 @@ const generateUserSpecificId = (userId: string, suffix: string): string => {
     hash.substring(8, 12),
     hash.substring(12, 16),
     hash.substring(16, 20),
-    hash.substring(20, 32)
+    hash.substring(20, 32),
   ].join('-');
 };
 
 // Factory function to create user-specific initial conversations
-export const createInitialConversationsForUser = (userId: string): Conversation[] => {
+export const createInitialConversationsForUser = (
+  userId: string,
+): Conversation[] => {
   // Generate user-specific IDs - deterministic but unique per user
   const supermemoryId = generateUserSpecificId(userId, 'supermemory-chat');
   const profileId = generateUserSpecificId(userId, 'profile-chat');
-  const supermemoryAssistantId = generateUserSpecificId(userId, 'supermemory-assistant');
-  const profileAssistantId = generateUserSpecificId(userId, 'profile-assistant');
+  const supermemoryAssistantId = generateUserSpecificId(
+    userId,
+    'supermemory-assistant',
+  );
+  const profileAssistantId = generateUserSpecificId(
+    userId,
+    'profile-assistant',
+  );
   const welcomeMessageId = generateUserSpecificId(userId, 'welcome-message');
   const profileQuestionId = generateUserSpecificId(userId, 'profile-question');
   const profileResponseId = generateUserSpecificId(userId, 'profile-response');
@@ -38,9 +46,9 @@ export const createInitialConversationsForUser = (userId: string): Conversation[
       recipients: [
         {
           id: supermemoryAssistantId,
-          name: "Supermemory",
-          bio: "Your AI-powered memory assistant",
-          title: "AI Assistant",
+          name: 'Supermemory',
+          bio: 'Your AI-powered memory assistant',
+          title: 'AI Assistant',
         },
       ],
       lastMessageTime: getTimeAgo(1),
@@ -49,8 +57,16 @@ export const createInitialConversationsForUser = (userId: string): Conversation[
       messages: [
         {
           id: welcomeMessageId,
-          content: "Hello! I'm Supermemory, your AI-powered memory assistant. I can help you remember, organize, and find information. What would you like to know or discuss today?",
-          sender: "Supermemory",
+          content:
+            "hey dude, what's up? I'm a chatbot made by [supermemory.ai](https://supermemory.ai) to show how easy it is to make chatbots like myself, using supermemory.",
+          sender: 'Supermemory',
+          timestamp: getTimeAgo(5),
+        },
+        {
+          id: welcomeMessageId,
+          content:
+            'to get started, can you please give me your: \n- Full name\n- Email address?\nAlso, tell me a little bit about yourself!',
+          sender: 'Supermemory',
           timestamp: getTimeAgo(5),
         },
       ],
@@ -60,9 +76,9 @@ export const createInitialConversationsForUser = (userId: string): Conversation[
       recipients: [
         {
           id: profileAssistantId,
-          name: "Profile",
-          bio: "Your Supermemory profile",
-          title: "Profile",
+          name: 'Profile',
+          bio: 'Your Supermemory profile',
+          title: 'Profile',
         },
       ],
       lastMessageTime: getTimeAgo(0),
@@ -71,14 +87,14 @@ export const createInitialConversationsForUser = (userId: string): Conversation[
       messages: [
         {
           id: profileQuestionId,
-          content: "who am i",
-          sender: "me",
+          content: 'who am i',
+          sender: 'me',
           timestamp: getTimeAgo(1),
         },
         {
           id: profileResponseId,
-          content: "Loading your profile...",
-          sender: "Profile",
+          content: 'Loading your profile...',
+          sender: 'Profile',
           timestamp: getTimeAgo(0),
         },
       ],
@@ -87,12 +103,12 @@ export const createInitialConversationsForUser = (userId: string): Conversation[
 };
 
 // Helper functions to get user-specific IDs
-export const getUserSpecificSupermemoryId = (userId: string): string => 
+export const getUserSpecificSupermemoryId = (userId: string): string =>
   generateUserSpecificId(userId, 'supermemory-chat');
 
-export const getUserSpecificProfileId = (userId: string): string => 
+export const getUserSpecificProfileId = (userId: string): string =>
   generateUserSpecificId(userId, 'profile-chat');
 
 // Legacy export for backward compatibility - but now requires userId
-export const getInitialConversations = (userId: string): Conversation[] => 
+export const getInitialConversations = (userId: string): Conversation[] =>
   createInitialConversationsForUser(userId);

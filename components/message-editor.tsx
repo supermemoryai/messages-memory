@@ -13,18 +13,20 @@ import { Textarea } from './ui/textarea';
 import { deleteTrailingMessages } from '@/app/(chat)/actions';
 import type { UseChatHelpers } from '@ai-sdk/react';
 
+export type ChatMessage = UIMessage;
+
 export type MessageEditorProps = {
   message: UIMessage;
   setMode: Dispatch<SetStateAction<'view' | 'edit' | 'delete'>>;
-  setMessages: UseChatHelpers['setMessages'];
-  reload: UseChatHelpers['reload'];
+  setMessages: UseChatHelpers<ChatMessage>['setMessages'];
+  regenerate: UseChatHelpers<ChatMessage>['regenerate'];
 };
 
 export function MessageEditor({
   message,
   setMode,
   setMessages,
-  reload,
+  regenerate,
 }: MessageEditorProps) {
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
@@ -91,7 +93,7 @@ export function MessageEditor({
 
             // @ts-expect-error todo: support UIMessage in setMessages
             setMessages((messages) => {
-              const index = messages.findIndex((m) => m.id === message.id);
+              const index = messages.findIndex((m: any) => m.id === message.id);
 
               if (index !== -1) {
                 const updatedMessage = {
@@ -107,7 +109,7 @@ export function MessageEditor({
             });
 
             setMode('view');
-            reload();
+            regenerate();
           }}
         >
           {isSubmitting ? 'Sending...' : 'Send'}

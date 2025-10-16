@@ -176,18 +176,37 @@ export async function POST(request: Request) {
       onFinish: async ({ text, steps }) => {
         if (session.user?.id) {
           try {
-            await saveMessages({
-              messages: [
-                {
-                  id: generateUUID(),
-                  chatId: id,
-                  role: 'assistant',
-                  parts: [{ type: 'text', text }],
-                  attachments: [],
-                  createdAt: new Date(),
-                },
-              ],
-            });
+            // Check if the response contains split delimiter
+            const splitMessages = text.split('<SPLIT>').map(t => t.trim()).filter(t => t.length > 0);
+            
+            // If there are multiple messages, save them separately with small time delays
+            if (splitMessages.length > 1) {
+              const messagesToSave = splitMessages.map((messageText, index) => ({
+                id: generateUUID(),
+                chatId: id,
+                role: 'assistant' as const,
+                parts: [{ type: 'text' as const, text: messageText }],
+                attachments: [],
+                // Add small time increments to ensure correct ordering
+                createdAt: new Date(Date.now() + index * 100),
+              }));
+              
+              await saveMessages({ messages: messagesToSave });
+            } else {
+              // Single message, save as before
+              await saveMessages({
+                messages: [
+                  {
+                    id: generateUUID(),
+                    chatId: id,
+                    role: 'assistant',
+                    parts: [{ type: 'text', text }],
+                    attachments: [],
+                    createdAt: new Date(),
+                  },
+                ],
+              });
+            }
           } catch (error) {
             console.error('Failed to save chat:', error);
           }
