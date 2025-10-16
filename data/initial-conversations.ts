@@ -1,5 +1,5 @@
 import type { Conversation } from '../types';
-import { createHash } from 'node:crypto';
+import { createHash } from 'crypto';
 
 // Helper function to create a timestamp for a specific time ago
 const getTimeAgo = (minutes: number) => {
