@@ -147,6 +147,7 @@ export async function POST(request: Request) {
     // Wrap the language model with supermemory
     const baseModel = myProvider(session.user.id).languageModel(selectedChatModel);
     const modelWithMemory = withSupermemory(baseModel, containerTag, {
+      conversationId: id,
       mode: "full",
       verbose: true,
       addMemory: "always"
