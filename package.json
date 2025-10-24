@@ -48,7 +48,7 @@
     "@radix-ui/react-switch": "^1.2.6",
     "@radix-ui/react-tooltip": "^1.2.6",
     "@radix-ui/react-visually-hidden": "^1.2.2",
-    "@supermemory/tools": "^1.2.13",
+    "@supermemory/tools": "^1.2.16",
     "@tiptap/extension-mention": "^3.6.6",
     "@tiptap/extension-placeholder": "^3.6.6",
     "@tiptap/pm": "^3.6.6",
