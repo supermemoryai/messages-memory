@@ -16,6 +16,7 @@ import { MessageInput } from './message-input';
 import { ConversationHeader } from './conversation-header';
 import { Markdown } from './markdown';
 import { TypingBubble } from './typing-bubble';
+import { MessageForm } from './message-form';
 
 interface ChatAreaProps {
   isNewChat: boolean;
@@ -29,7 +30,11 @@ interface ChatAreaProps {
     conversationId?: string,
     attachments?: Attachment[],
   ) => void;
-  onReaction?: (messageId: string, reaction: Reaction) => void;
+  onReaction?: (
+    messageId: string,
+    reaction: Reaction,
+    splitIndex?: number,
+  ) => void;
   typingStatus: { conversationId: string; recipient: string } | null;
   conversationId: string | null;
   onUpdateConversationName?: (name: string) => void;
@@ -63,6 +68,7 @@ export function ChatArea({
   userId,
 }: ChatAreaProps) {
   const [inputValue, setInputValue] = useState(messageDraft);
+  const [submittedForm, setSubmittedForm] = useState<boolean>(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { theme, systemTheme } = useTheme();
@@ -140,10 +146,21 @@ export function ChatArea({
   };
 
   // Check if a specific reaction type is already active for the current user
-  const isReactionActive = (message: any, type: ReactionType) => {
+  const isReactionActive = (
+    message: any,
+    type: ReactionType,
+    splitIndex?: number,
+    hasSplits?: boolean,
+  ) => {
     return (
       message.reactions?.some(
-        (r: Reaction) => r.type === type && r.sender === 'me',
+        (r: Reaction) =>
+          r.type === type &&
+          r.sender === 'me' &&
+          // Check splitIndex if message has splits
+          (!hasSplits ||
+            r.splitIndex === splitIndex ||
+            (r.splitIndex === undefined && splitIndex === 0)),
       ) ?? false
     );
   };
@@ -162,6 +179,16 @@ export function ChatArea({
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [activeConversation?.messages]);
+
+  useEffect(() => {
+    if (
+      localStorage.getItem('submittedForm') === `submitted-${conversationId}`
+    ) {
+      setSubmittedForm(true);
+    } else {
+      setSubmittedForm(false);
+    }
+  }, [conversationId]);
 
   const handleInputChange = (value: string) => {
     setInputValue(value);
@@ -242,6 +269,16 @@ export function ChatArea({
             return [];
           }
 
+          // Calculate if this is a recent message for animation
+          const totalMessages = activeConversation.messages.length;
+          const recentThreshold = 5; // Show animation for last 5 messages
+          const isRecentMessage = index >= totalMessages - recentThreshold;
+
+          // Calculate animation delay based on position in recent messages
+          const recentMessageIndex = isRecentMessage
+            ? index - (totalMessages - recentThreshold)
+            : -1;
+
           return contentParts.map((content, splitIndex) => {
             const prevMessage =
               index > 0 ? activeConversation.messages[index - 1] : null;
@@ -259,6 +296,18 @@ export function ChatArea({
               splitIndex === contentParts.length - 1 &&
               (!nextMessage || nextMessage.sender !== message.sender);
 
+            const isNewMessage =
+              new Date().getTime() - new Date(message.timestamp).getTime() <
+              2000;
+
+            // Calculate staggered animation delay - messages appear one by one
+            const baseDelay = 150; // Base delay between messages in ms
+            const splitDelay = 75; // Additional delay for split parts
+            const animationDelay =
+              isRecentMessage && isNewMessage
+                ? `${recentMessageIndex * baseDelay + splitIndex * Math.random() * splitDelay}ms`
+                : '0ms';
+
             return (
               <div
                 key={`${message.id}-split-${splitIndex}`}
@@ -267,7 +316,14 @@ export function ChatArea({
                   isMe ? 'justify-end' : 'justify-start',
                   isFirstInGroup ? 'mt-3' : 'mt-0.5',
                   index === 0 && splitIndex === 0 && 'mt-0',
+                  isRecentMessage && isNewMessage && 'animate-message-in',
                 )}
+                style={{
+                  animationDelay:
+                    isRecentMessage && isNewMessage
+                      ? animationDelay
+                      : undefined,
+                }}
               >
                 <div
                   className={cn(
@@ -311,112 +367,192 @@ export function ChatArea({
                     )}
                   {content && (
                     <div className="relative">
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <button
-                            type="button"
-                            className={cn(
-                              'max-w-[280px] sm:max-w-md px-3.5 py-2 text-[17px] leading-[22px] break-words text-left',
-                              isMe
-                                ? 'bg-[#007AFF] text-white'
-                                : 'bg-[#E9E9EB] dark:bg-[#262628] text-black dark:text-white',
-                              // Bubble shape based on position in group
-                              isMe
-                                ? isFirstInGroup && isLastInGroup
-                                  ? 'rounded-[18px]'
-                                  : isFirstInGroup
-                                    ? 'rounded-[18px] rounded-br-[4px]'
-                                    : isLastInGroup
-                                      ? 'rounded-[18px] rounded-tr-[4px]'
-                                      : 'rounded-[18px] rounded-tr-[4px] rounded-br-[4px]'
-                                : isFirstInGroup && isLastInGroup
-                                  ? 'rounded-[18px]'
-                                  : isFirstInGroup
-                                    ? 'rounded-[18px] rounded-bl-[4px]'
-                                    : isLastInGroup
-                                      ? 'rounded-[18px] rounded-tl-[4px]'
-                                      : 'rounded-[18px] rounded-tl-[4px] rounded-bl-[4px]',
-                            )}
-                          >
-                            <div
+                      {/* Only show Popover for reactions if message doesn't have a form or form was submitted */}
+                      {!message.form || submittedForm ? (
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <button
+                              type="button"
                               className={cn(
-                                'prose prose-sm max-w-none',
-                                isMe ? 'prose-invert' : 'dark:prose-invert',
-                                '[&_p]:my-1 [&_p]:leading-[22px] [&_p:first-child]:mt-0 [&_p:last-child]:mb-0',
-                                '[&_h1]:text-xl [&_h1]:mt-2 [&_h1]:mb-1',
-                                '[&_h2]:text-lg [&_h2]:mt-2 [&_h2]:mb-1',
-                                '[&_h3]:text-base [&_h3]:mt-2 [&_h3]:mb-1',
-                                '[&_ul]:my-1 [&_ol]:my-1',
-                                '[&_li]:my-0',
-                                '[&_code]:text-sm [&_code]:rounded [&_code]:px-1',
+                                'max-w-[280px] sm:max-w-md px-3.5 py-2 text-[17px] leading-[22px] break-words text-left',
                                 isMe
-                                  ? '[&_a]:text-white [&_a]:underline'
-                                  : '[&_a]:text-blue-500',
+                                  ? 'bg-[#007AFF] text-white'
+                                  : 'bg-[#E9E9EB] dark:bg-[#262628] text-black dark:text-white',
+                                // Bubble shape based on position in group
+                                isMe
+                                  ? isFirstInGroup && isLastInGroup
+                                    ? 'rounded-[18px]'
+                                    : isFirstInGroup
+                                      ? 'rounded-[18px] rounded-br-[4px]'
+                                      : isLastInGroup
+                                        ? 'rounded-[18px] rounded-tr-[4px]'
+                                        : 'rounded-[18px] rounded-tr-[4px] rounded-br-[4px]'
+                                  : isFirstInGroup && isLastInGroup
+                                    ? 'rounded-[18px]'
+                                    : isFirstInGroup
+                                      ? 'rounded-[18px] rounded-bl-[4px]'
+                                      : isLastInGroup
+                                        ? `rounded-[18px] rounded-tl-[4px]`
+                                        : 'rounded-[18px] rounded-tl-[4px] rounded-bl-[4px]',
                               )}
                             >
-                              <Markdown>{content}</Markdown>
-                            </div>
-                          </button>
-                        </PopoverTrigger>
-
-                        {/* Reaction menu */}
-                        <PopoverContent
-                          className="flex p-2 gap-2 w-fit rounded-full bg-gray-100 dark:bg-[#404040] z-50"
-                          align={isMe ? 'end' : 'start'}
-                          alignOffset={-8}
-                          side="top"
-                          sideOffset={20}
-                        >
-                          {/* Reaction buttons */}
-                          {Object.entries(menuReactionIcons).map(
-                            ([type, icon]) => (
-                              <button
-                                key={type}
-                                type="button"
-                                onClick={() => {
-                                  onReaction?.(message.id, {
-                                    type: type as ReactionType,
-                                    sender: 'me',
-                                    timestamp: new Date().toISOString(),
-                                  });
-                                }}
+                              <div
                                 className={cn(
-                                  'inline-flex items-center justify-center rounded-full w-8 h-8 aspect-square p-0 cursor-pointer text-base transition-all duration-200 ease-out text-gray-500 hover:scale-125 flex-shrink-0',
-                                  isReactionActive(
-                                    message,
-                                    type as ReactionType,
-                                  )
-                                    ? 'bg-[#0A7CFF] text-white scale-110'
-                                    : '',
+                                  'prose prose-sm max-w-none',
+                                  isMe ? 'prose-invert' : 'dark:prose-invert',
+                                  '[&_p]:my-1 [&_p]:leading-[22px] [&_p:first-child]:mt-0 [&_p:last-child]:mb-0',
+                                  '[&_h1]:text-xl [&_h1]:mt-2 [&_h1]:mb-1',
+                                  '[&_h2]:text-lg [&_h2]:mt-2 [&_h2]:mb-1',
+                                  '[&_h3]:text-base [&_h3]:mt-2 [&_h3]:mb-1',
+                                  '[&_ul]:my-1 [&_ol]:my-1',
+                                  '[&_li]:my-0',
+                                  '[&_code]:text-sm [&_code]:rounded [&_code]:px-1',
+                                  isMe
+                                    ? '[&_a]:text-white [&_a]:underline'
+                                    : '[&_a]:text-blue-500',
                                 )}
                               >
-                                <Image
-                                  src={
+                                <Markdown>{content}</Markdown>
+                              </div>
+                            </button>
+                          </PopoverTrigger>
+
+                          {/* Reaction menu */}
+                          <PopoverContent
+                            className="flex p-2 gap-2 w-fit rounded-full bg-gray-100 dark:bg-[#404040] z-50"
+                            align={isMe ? 'end' : 'start'}
+                            alignOffset={-8}
+                            side="top"
+                            sideOffset={20}
+                          >
+                            {/* Reaction buttons */}
+                            {Object.entries(menuReactionIcons).map(
+                              ([type, icon]) => (
+                                <button
+                                  key={type}
+                                  type="button"
+                                  onClick={() => {
+                                    onReaction?.(
+                                      message.id,
+                                      {
+                                        type: type as ReactionType,
+                                        sender: 'me',
+                                        timestamp: new Date().toISOString(),
+                                        splitIndex:
+                                          contentParts.length > 1
+                                            ? splitIndex
+                                            : undefined,
+                                      },
+                                      contentParts.length > 1
+                                        ? splitIndex
+                                        : undefined,
+                                    );
+                                  }}
+                                  className={cn(
+                                    'inline-flex items-center justify-center rounded-full w-8 h-8 aspect-square p-0 cursor-pointer text-base transition-all duration-200 ease-out text-gray-500 hover:scale-125 flex-shrink-0',
                                     isReactionActive(
                                       message,
                                       type as ReactionType,
+                                      splitIndex,
+                                      contentParts.length > 1,
                                     )
-                                      ? icon
-                                          .replace('-gray', '-white')
-                                          .replace('-dark', '-white')
-                                      : icon
-                                  }
-                                  width={16}
-                                  height={16}
-                                  alt={`${type} reaction`}
-                                  style={
-                                    type === 'emphasize'
-                                      ? { transform: 'scale(0.75)' }
-                                      : type === 'question'
-                                        ? { transform: 'scale(0.6)' }
-                                        : undefined
-                                  }
-                                />
-                              </button>
-                            ),
+                                      ? 'bg-[#0A7CFF] text-white scale-110'
+                                      : '',
+                                  )}
+                                >
+                                  <Image
+                                    src={
+                                      isReactionActive(
+                                        message,
+                                        type as ReactionType,
+                                        splitIndex,
+                                        contentParts.length > 1,
+                                      )
+                                        ? icon
+                                            .replace('-gray', '-white')
+                                            .replace('-dark', '-white')
+                                        : icon
+                                    }
+                                    width={16}
+                                    height={16}
+                                    alt={`${type} reaction`}
+                                    style={
+                                      type === 'emphasize'
+                                        ? { transform: 'scale(0.75)' }
+                                        : type === 'question'
+                                          ? { transform: 'scale(0.6)' }
+                                          : undefined
+                                    }
+                                  />
+                                </button>
+                              ),
+                            )}
+                          </PopoverContent>
+                        </Popover>
+                      ) : (
+                        /* When there's a form and it hasn't been submitted, render without popover */
+                        <div
+                          className={cn(
+                            'max-w-[280px] sm:max-w-md px-3.5 py-2 text-[17px] leading-[22px] break-words text-left',
+                            isMe
+                              ? 'bg-[#007AFF] text-white'
+                              : 'bg-[#E9E9EB] dark:bg-[#262628] text-black dark:text-white',
+                            // Bubble shape based on position in group
+                            isMe
+                              ? isFirstInGroup && isLastInGroup
+                                ? 'rounded-[18px]'
+                                : isFirstInGroup
+                                  ? 'rounded-[18px] rounded-br-[4px]'
+                                  : isLastInGroup
+                                    ? 'rounded-[18px] rounded-tr-[4px]'
+                                    : 'rounded-[18px] rounded-tr-[4px] rounded-br-[4px]'
+                              : isFirstInGroup && isLastInGroup
+                                ? 'rounded-[18px]'
+                                : isFirstInGroup
+                                  ? 'rounded-[18px] rounded-bl-[4px]'
+                                  : isLastInGroup
+                                    ? 'rounded-[18px] rounded-tl-[4px]'
+                                    : 'rounded-[18px] rounded-tl-[4px] rounded-bl-[4px]',
                           )}
-                        </PopoverContent>
-                      </Popover>
+                        >
+                          <div
+                            className={cn(
+                              'prose prose-sm max-w-none',
+                              isMe ? 'prose-invert' : 'dark:prose-invert',
+                              '[&_p]:my-1 [&_p]:leading-[22px] [&_p:first-child]:mt-0 [&_p:last-child]:mb-0',
+                              '[&_h1]:text-xl [&_h1]:mt-2 [&_h1]:mb-1',
+                              '[&_h2]:text-lg [&_h2]:mt-2 [&_h2]:mb-1',
+                              '[&_h3]:text-base [&_h3]:mt-2 [&_h3]:mb-1',
+                              '[&_ul]:my-1 [&_ol]:my-1',
+                              '[&_li]:my-0',
+                              '[&_code]:text-sm [&_code]:rounded [&_code]:px-1',
+                              isMe
+                                ? '[&_a]:text-white [&_a]:underline'
+                                : '[&_a]:text-blue-500',
+                            )}
+                          >
+                            <Markdown>{content}</Markdown>
+                          </div>
+                          {/* Render form if it exists and hasn't been submitted */}
+                          {message.form && !submittedForm && (
+                            <MessageForm
+                              messageId={message.id}
+                              onSubmit={(data) => {
+                                // Send the form submission directly without updating input state
+                                onSendMessage(
+                                  `Form Submission:\nName: ${data.name}\nEmail: ${data.email}`,
+                                  conversationId || undefined,
+                                );
+                                setSubmittedForm(true);
+                                localStorage.setItem(
+                                  `submittedForm`,
+                                  `submitted-${conversationId}`,
+                                );
+                              }}
+                            />
+                          )}
+                        </div>
+                      )}
 
                       {/* Display existing reactions */}
                       {message.reactions && message.reactions.length > 0 && (
@@ -428,6 +564,14 @@ export function ChatArea({
                           )}
                         >
                           {[...message.reactions]
+                            .filter(
+                              (r) =>
+                                // Only show reactions for this split part
+                                contentParts.length <= 1 ||
+                                r.splitIndex === splitIndex ||
+                                (r.splitIndex === undefined &&
+                                  splitIndex === 0), // Backward compatibility
+                            )
                             .sort(
                               (a, b) =>
                                 new Date(a.timestamp).getTime() -
@@ -502,7 +646,7 @@ export function ChatArea({
       </div>
 
       {/* Input - iMessage style with TipTap - hide for read-only chats */}
-      {!isReadOnly && (
+      {!isReadOnly && submittedForm && (
         <div className="absolute bottom-0 left-0 right-0 z-50 mb-[env(keyboard-inset-height,0px)]">
           <MessageInput
             message={inputValue}

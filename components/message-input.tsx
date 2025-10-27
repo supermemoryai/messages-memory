@@ -1,4 +1,4 @@
-import type { Recipient, Attachment } from "../types";
+import type { Recipient, Attachment } from '../types';
 import {
   useState,
   useRef,
@@ -7,18 +7,18 @@ import {
   useImperativeHandle,
   useCallback,
   type ChangeEvent,
-} from "react";
-import data from "@emoji-mart/data";
-import Picker from "@emoji-mart/react";
-import { Icons } from "./icons";
-import { useTheme } from "next-themes";
-import { useEditor, EditorContent } from "@tiptap/react";
-import StarterKit from "@tiptap/starter-kit";
-import Mention from "@tiptap/extension-mention";
-import type { SuggestionProps } from "@tiptap/suggestion";
-import Placeholder from "@tiptap/extension-placeholder";
-import { soundEffects } from "@/lib/sound-effects";
-import Image from "next/image";
+} from 'react';
+import data from '@emoji-mart/data';
+import Picker from '@emoji-mart/react';
+import { Icons } from './icons';
+import { useTheme } from 'next-themes';
+import { useEditor, EditorContent } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
+import Mention from '@tiptap/extension-mention';
+import type { SuggestionProps } from '@tiptap/suggestion';
+import Placeholder from '@tiptap/extension-placeholder';
+import { soundEffects } from '@/lib/sound-effects';
+import Image from 'next/image';
 
 interface MessageInputProps {
   message: string;
@@ -39,7 +39,7 @@ export type MessageInputHandle = {
 // Forward ref component to expose focus method to parent
 export const MessageInput = forwardRef<
   MessageInputHandle,
-  Omit<MessageInputProps, "ref">
+  Omit<MessageInputProps, 'ref'>
 >(function MessageInput(
   {
     message,
@@ -51,7 +51,7 @@ export const MessageInput = forwardRef<
     conversationId,
     isNewChat = false,
   },
-  ref
+  ref,
 ) {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
@@ -67,34 +67,34 @@ export const MessageInput = forwardRef<
     extensions: [
       StarterKit,
       Placeholder.configure({
-        placeholder: disabled ? "This chat is read-only" : "Type a message...",
+        placeholder: disabled ? 'This chat is read-only' : 'Type a message...',
       }),
       Mention.configure({
         HTMLAttributes: {
-          class: "mention-node",
-          style: "color: #0A7CFF !important; font-weight: 500 !important;",
+          class: 'mention-node',
+          style: 'color: #0A7CFF !important; font-weight: 500 !important;',
           onanimationend: 'this.classList.add("shimmer-done")',
         },
         renderText: ({ node }) => {
           // Try to find the recipient by ID to get their name
           const recipient = recipients.find((r) => r.id === node.attrs.id);
           return (
-            recipient?.name.split(" ")[0] ?? node.attrs.label ?? node.attrs.id
+            recipient?.name.split(' ')[0] ?? node.attrs.label ?? node.attrs.id
           );
         },
         renderHTML: ({ node }) => {
           // Try to find the recipient by ID to get their name
           const recipient = recipients.find((r) => r.id === node.attrs.id);
           const label =
-            recipient?.name.split(" ")[0] ?? node.attrs.label ?? node.attrs.id;
+            recipient?.name.split(' ')[0] ?? node.attrs.label ?? node.attrs.id;
           return [
-            "span",
+            'span',
             {
-              "data-type": "mention",
-              "data-id": node.attrs.id,
-              "data-label": label,
-              class: "mention-node",
-              style: "color: #0A7CFF !important; font-weight: 500 !important;",
+              'data-type': 'mention',
+              'data-id': node.attrs.id,
+              'data-label': label,
+              class: 'mention-node',
+              style: 'color: #0A7CFF !important; font-weight: 500 !important;',
             },
             label,
           ];
@@ -103,16 +103,16 @@ export const MessageInput = forwardRef<
           items: ({ query }: { query: string }) => {
             if (!query) return [];
 
-            const searchText = query.toLowerCase().replace(/^@/, "");
+            const searchText = query.toLowerCase().replace(/^@/, '');
             return recipients
               .filter((recipient) => {
-                const [firstName] = recipient.name.split(" ");
+                const [firstName] = recipient.name.split(' ');
                 return firstName.toLowerCase().startsWith(searchText);
               })
               .slice(0, 5)
               .map((match) => ({
                 id: match.id,
-                label: match.name.split(" ")[0],
+                label: match.name.split(' ')[0],
               }));
           },
           render: () => {
@@ -128,14 +128,14 @@ export const MessageInput = forwardRef<
               onStart: (props: SuggestionProps) => {
                 const { editor } = props;
                 component = {
-                  element: document.createElement("div"),
+                  element: document.createElement('div'),
                   update: (props) => {
                     if (!props.query) return;
 
                     const match = props.items.find(
                       (item) =>
                         item.label.toLowerCase() ===
-                        props.query.toLowerCase().replace(/^@/, "")
+                        props.query.toLowerCase().replace(/^@/, ''),
                     );
 
                     if (match) {
@@ -148,7 +148,7 @@ export const MessageInput = forwardRef<
                         .deleteRange({ from: start, to: end })
                         .insertContent([
                           {
-                            type: "mention",
+                            type: 'mention',
                             attrs: { id: match.id, label: match.label },
                           },
                         ])
@@ -166,22 +166,22 @@ export const MessageInput = forwardRef<
               },
             };
           },
-          char: "@",
+          char: '@',
           allowSpaces: false,
-          decorationClass: "suggestion",
+          decorationClass: 'suggestion',
         },
       }),
     ],
     content: message,
-    autofocus: !isMobileView && !isNewChat ? "end" : false,
+    autofocus: !isMobileView && !isNewChat ? 'end' : false,
     onUpdate: ({ editor }) => {
       if (editor.view?.dom) {
         const element = editor.view.dom as HTMLElement;
         const height = Math.min(200, Math.max(32, element.scrollHeight));
         const containerHeight = height + 32; // Add padding (16px top + 16px bottom)
         document.documentElement.style.setProperty(
-          "--dynamic-height",
-          `${containerHeight}px`
+          '--dynamic-height',
+          `${containerHeight}px`,
         );
       }
       setMessage(editor.getHTML());
@@ -191,7 +191,7 @@ export const MessageInput = forwardRef<
         // Delay focus slightly to ensure view is ready
         setTimeout(() => {
           if (editor.view?.dom) {
-            editor.commands.focus("end");
+            editor.commands.focus('end');
           }
         }, 0);
       }
@@ -199,10 +199,12 @@ export const MessageInput = forwardRef<
     editorProps: {
       attributes: {
         class:
-          "w-full bg-background border border-muted-foreground/20 rounded-[18px] pl-4 pr-10 py-2 text-base leading-tight focus:outline-none focus:border-[#007AFF] focus:ring-1 focus:ring-[#007AFF] disabled:opacity-50 prose prose-sm prose-neutral dark:prose-invert max-w-none flex items-center",
-        enterKeyHint: "send",
-        style: "min-height: 36px; max-height: 200px; overflow-y: auto;",
-        contentEditable: (attachments.length === 0 && uploadQueue.length === 0).toString(),
+          'w-full bg-background border border-muted-foreground/20 rounded-[18px] pl-4 pr-10 py-2 text-base leading-tight focus:outline-none focus:border-[#007AFF] focus:ring-1 focus:ring-[#007AFF] disabled:opacity-50 prose prose-sm prose-neutral dark:prose-invert max-w-none flex items-center',
+        enterKeyHint: 'send',
+        style: 'min-height: 36px; max-height: 200px; overflow-y: auto;',
+        contentEditable: (
+          attachments.length === 0 && uploadQueue.length === 0
+        ).toString(),
       },
       handleKeyDown: (view, event) => {
         // Disable keyboard input when uploading
@@ -210,7 +212,7 @@ export const MessageInput = forwardRef<
           event.preventDefault();
           return true;
         }
-        if (event.key === "Enter" && !event.shiftKey) {
+        if (event.key === 'Enter' && !event.shiftKey) {
           event.preventDefault();
           handleSubmit();
           if (isMobileView && view.dom) {
@@ -285,11 +287,11 @@ export const MessageInput = forwardRef<
     if (disabled) {
       return;
     }
-    
+
     if (attachments.length > 0) {
       // Send attachments with a placeholder message
       const currentMessage = message.trim();
-      setMessage("");
+      setMessage('');
       if (editor && !editor.isDestroyed) {
         editor.commands.clearContent();
       }
@@ -309,11 +311,11 @@ export const MessageInput = forwardRef<
       focus: () => {
         // Focus editor at end of content
         if (editor && !editor.isDestroyed && editor.view && editor.view.dom) {
-          editor.commands.focus("end");
+          editor.commands.focus('end');
         }
       },
     }),
-    [editor]
+    [editor],
   );
 
   // Effects
@@ -342,11 +344,19 @@ export const MessageInput = forwardRef<
 
   // Focus editor at end of content
   useEffect(() => {
-    if (editor && !editor.isDestroyed && editor.view && editor.view.dom && conversationId && !isMobileView && !isNewChat) {
+    if (
+      editor &&
+      !editor.isDestroyed &&
+      editor.view &&
+      editor.view.dom &&
+      conversationId &&
+      !isMobileView &&
+      !isNewChat
+    ) {
       // Use a small timeout to ensure the view is fully mounted
       const timer = setTimeout(() => {
         if (editor && !editor.isDestroyed && editor.view && editor.view.dom) {
-          editor.commands.focus("end");
+          editor.commands.focus('end');
         }
       }, 0);
       return () => clearTimeout(timer);
@@ -359,7 +369,7 @@ export const MessageInput = forwardRef<
       if (editor && !editor.isDestroyed && editor.view && editor.view.dom) {
         const element = editor.view.dom as HTMLElement;
         // Force reflow to get accurate scrollHeight
-        element.style.height = "auto";
+        element.style.height = 'auto';
         // Get the scroll height including all content
         const contentHeight = element.scrollHeight;
         // Set the height considering padding and ensuring we don't exceed max height
@@ -368,10 +378,10 @@ export const MessageInput = forwardRef<
 
         // Handle height for both mobile and desktop
         element.style.height = `${height}px`;
-        element.style.overflowY = height >= 200 ? "auto" : "hidden";
+        element.style.overflowY = height >= 200 ? 'auto' : 'hidden';
         document.documentElement.style.setProperty(
-          "--dynamic-height",
-          `${containerHeight}px`
+          '--dynamic-height',
+          `${containerHeight}px`,
         );
       }
     };
@@ -382,30 +392,36 @@ export const MessageInput = forwardRef<
     }
 
     // Update height on editor changes
-    editor.on("update", updateHeight);
+    editor.on('update', updateHeight);
 
     // Update height on window resize
-    window.addEventListener("resize", updateHeight);
+    window.addEventListener('resize', updateHeight);
 
     // Initial height calculation with small delay to ensure view is mounted
     const timer = setTimeout(updateHeight, 0);
 
     return () => {
       clearTimeout(timer);
-      window.removeEventListener("resize", updateHeight);
+      window.removeEventListener('resize', updateHeight);
       if (editor && !editor.isDestroyed) {
-        editor.off("update", updateHeight);
+        editor.off('update', updateHeight);
       }
     };
   }, [editor, isMobileView]);
 
   // Reset editor height when message is cleared (e.g. after sending)
   useEffect(() => {
-    if (message === "" && editor && !editor.isDestroyed && editor.view && editor.view.dom) {
+    if (
+      message === '' &&
+      editor &&
+      !editor.isDestroyed &&
+      editor.view &&
+      editor.view.dom
+    ) {
       const element = editor.view.dom as HTMLElement;
       if (element) {
-        element.style.height = "32px";
-        document.documentElement.style.setProperty("--dynamic-height", "64px");
+        element.style.height = '32px';
+        document.documentElement.style.setProperty('--dynamic-height', '64px');
       }
     }
   }, [message, editor]);
@@ -424,7 +440,7 @@ export const MessageInput = forwardRef<
     };
 
     const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
+      if (event.key === 'Escape') {
         if (showEmojiPicker) {
           setShowEmojiPicker(false);
         } else if (editor && !editor.isDestroyed) {
@@ -433,12 +449,12 @@ export const MessageInput = forwardRef<
       }
     };
 
-    document.addEventListener("mousedown", handleClickOutside);
-    document.addEventListener("keydown", handleEscape);
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleEscape);
 
     return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-      document.removeEventListener("keydown", handleEscape);
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscape);
     };
   }, [showEmojiPicker, editor]);
 
@@ -450,6 +466,7 @@ export const MessageInput = forwardRef<
           <div className="flex gap-2 flex-wrap">
             {attachments.map((attachment, index) => (
               <div
+                // biome-ignore lint/suspicious/noArrayIndexKey: <explanation>
                 key={index}
                 className="relative w-20 h-16 rounded-md bg-muted overflow-hidden group"
               >
@@ -465,8 +482,11 @@ export const MessageInput = forwardRef<
                     <Icons.paperclip className="h-6 w-6" />
                   </div>
                 )}
+                {/* biome-ignore lint/a11y/useButtonType: <explanation> */}
                 <button
-                  onClick={() => setAttachments(attachments.filter((_, i) => i !== index))}
+                  onClick={() =>
+                    setAttachments(attachments.filter((_, i) => i !== index))
+                  }
                   className="absolute top-0.5 right-0.5 bg-destructive/90 hover:bg-destructive text-destructive-foreground rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
                 >
                   <Icons.close className="h-3 w-3" />
@@ -475,7 +495,10 @@ export const MessageInput = forwardRef<
             ))}
             {uploadQueue.map((filename, index) => (
               <div
-                key={`uploading-${index}`}
+                key={`uploading-${
+                  // biome-ignore lint/suspicious/noArrayIndexKey: <explanation>
+                  index
+                }`}
                 className="relative w-20 h-16 rounded-md bg-muted overflow-hidden flex items-center justify-center"
               >
                 <Icons.spinner className="h-6 w-6 animate-spin" />
@@ -484,17 +507,17 @@ export const MessageInput = forwardRef<
           </div>
         </div>
       )}
-      
+
       <div className="flex gap-2 p-4">
-              <input
-                ref={fileInputRef}
-                type="file"
-                className="hidden"
-                onChange={handleFileChange}
-                multiple
-                accept="*/*"
-              />
-        
+        <input
+          ref={fileInputRef}
+          type="file"
+          className="hidden"
+          onChange={handleFileChange}
+          multiple
+          accept="*/*"
+        />
+
         {/* Camera/Image button */}
         {!editor?.getText().trim() && (
           <button
@@ -506,18 +529,20 @@ export const MessageInput = forwardRef<
             <Icons.paperclip className="h-5 w-5" />
           </button>
         )}
-        
+
         <div className="relative flex-1">
-          <EditorContent 
-            editor={editor} 
-            className={`w-full ${(attachments.length > 0 || uploadQueue.length > 0) ? 'opacity-50 pointer-events-none' : ''}`} 
+          <EditorContent
+            editor={editor}
+            className={`w-full ${attachments.length > 0 || uploadQueue.length > 0 ? 'opacity-50 pointer-events-none' : ''}`}
           />
           {/* Show send button when there's text or attachments */}
           {(editor?.getText().trim() || attachments.length > 0) && (
             <button
               type="submit"
               onClick={handleSubmit}
-              disabled={disabled || (!message.trim() && attachments.length === 0)}
+              disabled={
+                disabled || (!message.trim() && attachments.length === 0)
+              }
               className="absolute right-1 bottom-1 bg-[#0A7CFF] rounded-full p-1.5 text-white font-bold transition-colors hover:bg-[#0A7CFF]/90 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
               aria-label="Send message"
             >
@@ -525,24 +550,26 @@ export const MessageInput = forwardRef<
             </button>
           )}
         </div>
-        
+
         {/* Show emoji picker for desktop */}
-        {!isMobileView && attachments.length === 0 && uploadQueue.length === 0 && (
-          <button
-            ref={buttonRef}
-            type="button"
-            onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-            className="text-muted-foreground hover:text-foreground transition-colors flex-shrink-0 self-end pb-[6px]"
-          >
-            <Icons.smile className="h-5 w-5" />
-          </button>
-        )}
-        
+        {!isMobileView &&
+          attachments.length === 0 &&
+          uploadQueue.length === 0 && (
+            <button
+              ref={buttonRef}
+              type="button"
+              onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+              className="text-muted-foreground hover:text-foreground transition-colors flex-shrink-0 self-end pb-[6px]"
+            >
+              <Icons.smile className="h-5 w-5" />
+            </button>
+          )}
+
         {showEmojiPicker && !isMobileView && (
           <div
             ref={pickerRef}
             className="absolute bottom-16 right-4 z-50"
-            style={{ width: "352px" }}
+            style={{ width: '352px' }}
           >
             <Picker
               data={data}
@@ -552,7 +579,7 @@ export const MessageInput = forwardRef<
                 }
                 setShowEmojiPicker(false);
               }}
-              theme={theme === "dark" ? "dark" : "light"}
+              theme={theme === 'dark' ? 'dark' : 'light'}
             />
           </div>
         )}
