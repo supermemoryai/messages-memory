@@ -159,6 +159,22 @@
   }
 }
 
+  /* Staggered message animation - slide from below */
+  @keyframes slideInFromBottom {
+    0% {
+      opacity: 0;
+      transform: translateY(30px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .animate-message-in {
+    animation: slideInFromBottom 0.4s cubic-bezier(0.34, 0.69, 0.1, 1) both;
+  }
+
 /* Global caret styling */
 * {
   caret-color: #0A7CFF;

@@ -61,14 +61,42 @@ export const createInitialConversationsForUser = (
             "hey dude, what's up? I'm a chatbot made by [supermemory.ai](https://supermemory.ai) to show how easy it is to make chatbots like myself, using supermemory.",
           sender: 'Supermemory',
           timestamp: getTimeAgo(5),
+          form: {
+            id: 'user-info-form',
+            title: 'Tell me about yourself',
+            description:
+              'To get started, please provide the following information:',
+            fields: [
+              {
+                id: 'full-name',
+                label: 'Full Name',
+                type: 'text',
+                placeholder: 'Om Shah',
+                required: true,
+              },
+              {
+                id: 'email-address',
+                label: 'Email Address',
+                placeholder: 'shahom0306@gmail.com',
+                type: 'email',
+                required: true,
+              },
+              {
+                id: 'about-yourself',
+                label: 'About Yourself',
+                type: 'textarea',
+                required: false,
+              },
+            ],
+          },
         },
-        {
-          id: welcomeMessageId,
-          content:
-            'to get started, can you please give me your: \n- Full name\n- Email address?\nAlso, tell me a little bit about yourself!',
-          sender: 'Supermemory',
-          timestamp: getTimeAgo(5),
-        },
+        // {
+        //   id: welcomeMessageId,
+        //   content:
+        //     'to get started, can you please give me your: \n- Full name\n- Email address?\nAlso, tell me a little bit about yourself!',
+        //   sender: 'Supermemory',
+        //   timestamp: getTimeAgo(5),
+        // },
       ],
     },
     {

@@ -1,8 +1,4 @@
-import {
-  streamText,
-  convertToModelMessages,
-  stepCountIs,
-} from 'ai';
+import { streamText, convertToModelMessages, stepCountIs } from 'ai';
 import { withSupermemory } from '@supermemory/tools/ai-sdk';
 import { auth, type UserType } from '@/app/(auth)/auth';
 import { type RequestHints, systemPrompt } from '@/lib/ai/prompts';
@@ -38,7 +34,8 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { id, message, selectedChatModel, selectedVisibilityType } = requestBody;
+    const { id, message, selectedChatModel, selectedVisibilityType } =
+      requestBody;
 
     const session = await auth();
     if (!session?.user) {
@@ -74,9 +71,10 @@ export async function POST(request: Request) {
     // Convert DB messages to AI SDK v5 format (using parts array)
     const formattedPreviousMessages = previousMessages.map((dbMsg: any) => {
       // Ensure parts array exists, or create one from content if needed
-      const parts = Array.isArray(dbMsg.parts) && dbMsg.parts.length > 0
-        ? dbMsg.parts
-        : [{ type: 'text', text: dbMsg.content || '' }];
+      const parts =
+        Array.isArray(dbMsg.parts) && dbMsg.parts.length > 0
+          ? dbMsg.parts
+          : [{ type: 'text', text: dbMsg.content || '' }];
 
       return {
         id: dbMsg.id,
@@ -95,10 +93,7 @@ export async function POST(request: Request) {
     };
 
     // Append current message to previous messages
-    const messages = [
-      ...formattedPreviousMessages,
-      formattedCurrentMessage,
-    ];
+    const messages = [...formattedPreviousMessages, formattedCurrentMessage];
 
     const { longitude, latitude, city, country } = geolocation(request);
     const requestHints: RequestHints = {
@@ -115,7 +110,8 @@ export async function POST(request: Request) {
           id: message.id,
           role: 'user',
           parts: message.parts,
-          attachments: message.parts?.filter((part: any) => part.type === 'file') ?? [],
+          attachments:
+            message.parts?.filter((part: any) => part.type === 'file') ?? [],
           createdAt: new Date(),
         },
       ],
@@ -127,13 +123,19 @@ export async function POST(request: Request) {
     // Get the API key for supermemory tools
     const supermemoryApiKey = process.env.SUPERMEMORY_API_KEY;
     if (!supermemoryApiKey) {
-      return new ChatSDKError('bad_request:api', 'SUPERMEMORY_API_KEY is not configured').toResponse();
+      return new ChatSDKError(
+        'bad_request:api',
+        'SUPERMEMORY_API_KEY is not configured',
+      ).toResponse();
     }
 
     // Get the API key for Exa tools
     const exaApiKey = process.env.EXA_API_KEY;
     if (!exaApiKey) {
-      return new ChatSDKError('bad_request:api', 'EXA_API_KEY is not configured').toResponse();
+      return new ChatSDKError(
+        'bad_request:api',
+        'EXA_API_KEY is not configured',
+      ).toResponse();
     }
 
     // Always use user ID as container tag
@@ -145,25 +147,30 @@ export async function POST(request: Request) {
     const webSearchTool = createWebSearchTool(exaApiKey);
 
     // Wrap the language model with supermemory
-    const baseModel = myProvider(session.user.id).languageModel(selectedChatModel);
+    const baseModel = myProvider(session.user.id).languageModel(
+      selectedChatModel,
+    );
     const modelWithMemory = withSupermemory(baseModel, containerTag, {
       conversationId: id,
-      mode: "full",
+      mode: 'full',
       verbose: true,
-      addMemory: "always"
+      addMemory: 'always',
     });
 
     const toolsConfig = {
       searchMemories: memoryTools.searchMemories,
       webSearch: webSearchTool,
     };
-    
+
     // Log what messages we're sending to AI SDK
     const convertedMessages = convertToModelMessages(messages as any);
     convertedMessages.forEach((msg, idx) => {
       console.log(`[Chat API] Message ${idx}:`, {
         role: msg.role,
-        content: typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content)
+        content:
+          typeof msg.content === 'string'
+            ? msg.content
+            : JSON.stringify(msg.content),
       });
     });
 
@@ -178,20 +185,25 @@ export async function POST(request: Request) {
         if (session.user?.id) {
           try {
             // Check if the response contains split delimiter
-            const splitMessages = text.split('<SPLIT>').map(t => t.trim()).filter(t => t.length > 0);
-            
+            const splitMessages = text
+              .split('<SPLIT>')
+              .map((t) => t.trim())
+              .filter((t) => t.length > 0);
+
             // If there are multiple messages, save them separately with small time delays
             if (splitMessages.length > 1) {
-              const messagesToSave = splitMessages.map((messageText, index) => ({
-                id: generateUUID(),
-                chatId: id,
-                role: 'assistant' as const,
-                parts: [{ type: 'text' as const, text: messageText }],
-                attachments: [],
-                // Add small time increments to ensure correct ordering
-                createdAt: new Date(Date.now() + index * 100),
-              }));
-              
+              const messagesToSave = splitMessages.map(
+                (messageText, index) => ({
+                  id: generateUUID(),
+                  chatId: id,
+                  role: 'assistant' as const,
+                  parts: [{ type: 'text' as const, text: messageText }],
+                  attachments: [],
+                  // Add small time increments to ensure correct ordering
+                  createdAt: new Date(Date.now() + index * 100),
+                }),
+              );
+
               await saveMessages({ messages: messagesToSave });
             } else {
               // Single message, save as before
@@ -217,7 +229,7 @@ export async function POST(request: Request) {
       experimental_telemetry: {
         isEnabled: isProductionEnvironment,
         functionId: 'stream-text',
-      }
+      },
     });
 
     return result.toUIMessageStreamResponse();

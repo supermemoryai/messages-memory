@@ -7,13 +7,26 @@ export interface Attachment {
 export interface Message {
   id: string;
   content: string;
-  htmlContent?: string;  
-  sender: "me" | "system" | string;
+  htmlContent?: string;
+  sender: 'me' | 'system' | string;
   timestamp: string;
-  type?: "silenced";
-  mentions?: { id: string; name: string; }[];
+  type?: 'silenced';
+  mentions?: { id: string; name: string }[];
   reactions?: Reaction[];
   attachments?: Attachment[];
+  form?: {
+    id: string;
+    title: string;
+    description?: string;
+    fields: {
+      id: string;
+      label: string;
+      type: 'text' | 'email' | 'textarea' | 'number' | 'select';
+      required: boolean;
+      placeholder?: string;
+      options?: string[];
+    }[];
+  };
 }
 
 export interface Conversation {
@@ -36,10 +49,17 @@ export interface Recipient {
   title?: string;
 }
 
-export type ReactionType = 'heart' | 'like' | 'dislike' | 'laugh' | 'emphasize' | 'question';
+export type ReactionType =
+  | 'heart'
+  | 'like'
+  | 'dislike'
+  | 'laugh'
+  | 'emphasize'
+  | 'question';
 
 export interface Reaction {
   type: ReactionType;
   sender: string;
   timestamp: string;
+  splitIndex?: number; // Track which split part this reaction belongs to
 }

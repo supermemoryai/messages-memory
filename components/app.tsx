@@ -753,14 +753,16 @@ export default function App() {
 
   // Method to handle reaction
   const handleReaction = useCallback(
-    (messageId: string, reaction: Reaction) => {
+    (messageId: string, reaction: Reaction, splitIndex?: number) => {
       setConversations((prevConversations) => {
         return prevConversations.map((conversation) => {
           const messages = conversation.messages.map((message) => {
             if (message.id === messageId) {
-              // Check if this exact reaction already exists
+              // Check if this exact reaction already exists (including splitIndex)
               const existingReaction = message.reactions?.find(
-                (r) => r.sender === reaction.sender && r.type === reaction.type,
+                (r) => r.sender === reaction.sender &&
+                       r.type === reaction.type &&
+                       r.splitIndex === splitIndex,
               );
 
               if (existingReaction) {
@@ -772,15 +774,16 @@ export default function App() {
                       (r) =>
                         !(
                           r.sender === reaction.sender &&
-                          r.type === reaction.type
+                          r.type === reaction.type &&
+                          r.splitIndex === splitIndex
                         ),
                     ) || [],
                 };
               } else {
-                // Remove any other reaction from this sender and add the new one
+                // Remove any other reaction from this sender for this split and add the new one
                 const otherReactions =
                   message.reactions?.filter(
-                    (r) => r.sender !== reaction.sender,
+                    (r) => !(r.sender === reaction.sender && r.splitIndex === splitIndex),
                   ) || [];
                 return {
                   ...message,
