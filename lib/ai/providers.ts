@@ -21,10 +21,8 @@ const supermemory = (user?: string) => {
   console.log(`[Provider] Creating supermemory provider for user: ${user}`);
 
   return createAnthropic({
-    baseURL:
-      'https://api.anthropic.com/v1',
     apiKey: process.env.ANTHROPIC_API_KEY,
-  }).languageModel('claude-3-5-sonnet-latest');
+  }).languageModel('claude-3-7-sonnet-latest');
 };
 
 export const myProvider = isTestEnvironment
