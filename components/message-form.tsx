@@ -25,7 +25,10 @@ interface MessageFormProps {
   onSubmit: (data: { name: string; email: string }) => void;
 }
 
-export const MessageForm = memo(function MessageForm({ messageId, onSubmit }: MessageFormProps) {
+export const MessageForm = memo(function MessageForm({
+  messageId,
+  onSubmit,
+}: MessageFormProps) {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -36,10 +39,7 @@ export const MessageForm = memo(function MessageForm({ messageId, onSubmit }: Me
 
   return (
     <Form {...form}>
-      <form
-        onSubmit={form.handleSubmit(onSubmit)}
-        className="space-y-2 mt-3"
-      >
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-2 mt-3">
         <FormField
           control={form.control}
           name="name"
@@ -47,7 +47,7 @@ export const MessageForm = memo(function MessageForm({ messageId, onSubmit }: Me
             <FormItem>
               <FormLabel>Full Name</FormLabel>
               <FormControl>
-                <Input placeholder="Om Shah" {...field} />
+                <Input placeholder="Your name" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -62,7 +62,7 @@ export const MessageForm = memo(function MessageForm({ messageId, onSubmit }: Me
               <FormControl>
                 <Input
                   type="email"
-                  placeholder="shahom0306@gmail.com"
+                  placeholder="Your email (work or .edu preferred)"
                   {...field}
                 />
               </FormControl>
