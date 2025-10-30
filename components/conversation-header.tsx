@@ -8,8 +8,9 @@ import { cn, } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { getUserContacts, addUserContact } from "@/lib/contacts";
 import { ContactDrawer } from "./contact-drawer";
-import { RotateCcw, Trash2, MessageSquarePlus } from "lucide-react";
+import { RotateCcw, Trash2, MessageSquarePlus, Network } from "lucide-react";
 import { signOut, signIn } from "next-auth/react";
+import { MemoryGraphDialog } from "./memory-graph-dialog";
 
 // Helper to check if we can add more recipients
 const hasReachedMaxRecipients = (recipients: string) => {
@@ -300,6 +301,7 @@ export function ConversationHeader({
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const [isEditMode, setIsEditMode] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
+  const [showMemoryGraph, setShowMemoryGraph] = useState(false);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -891,6 +893,23 @@ export function ConversationHeader({
               </button>
             </div>
           )}
+
+          {/* Mobile Action Buttons - only show for Profile chat */}
+          {!isNewChat && activeConversation && activeConversation.recipients.some(r => r.name === 'Profile') && (
+            <div className="absolute right-4 top-8 flex gap-1">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowMemoryGraph(true);
+                }}
+                className="p-2 hover:bg-accent rounded-full transition-colors"
+                aria-label="View Memory Graph"
+                title="View Memory Graph"
+              >
+                <Network className="h-5 w-5" />
+              </button>
+            </div>
+          )}
         </div>
       ) : (
         // Desktop View
@@ -984,8 +1003,31 @@ export function ConversationHeader({
               </button>
             </div>
           )}
+
+          {/* Desktop Action Buttons - only show for Profile chat */}
+          {!isNewChat && activeConversation && activeConversation.recipients.some(r => r.name === 'Profile') && (
+            <div className="ml-auto flex gap-1">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowMemoryGraph(true);
+                }}
+                className="p-2 hover:bg-accent rounded-full transition-colors"
+                aria-label="View Memory Graph"
+                title="View Memory Graph"
+              >
+                <Network className="h-5 w-5" />
+              </button>
+            </div>
+          )}
         </div>
       )}
+
+      {/* Memory Graph Dialog */}
+      <MemoryGraphDialog
+        open={showMemoryGraph}
+        onOpenChange={setShowMemoryGraph}
+      />
     </div>
   );
 }

@@ -19,13 +19,16 @@ export async function GET(request: Request) {
     if (!process.env.SUPERMEMORY_API_KEY) {
       return NextResponse.json(
         { error: 'Supermemory API key not configured' },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
     try {
       // Use the actual Supermemory v4/profile API
-      console.log('[Profile API] Fetching profile from Supermemory with containerTag:', containerTag);
+      console.log(
+        '[Profile API] Fetching profile from Supermemory with containerTag:',
+        containerTag,
+      );
       const response = await fetch('https://api.supermemory.ai/v4/profile', {
         method: 'POST',
         headers: {
@@ -38,43 +41,59 @@ export async function GET(request: Request) {
       });
 
       if (!response.ok) {
-        console.error('[Profile API] Failed to fetch profile:', response.status);
+        console.error(
+          '[Profile API] Failed to fetch profile:',
+          response.status,
+        );
         const errorText = await response.text();
         console.error('[Profile API] Error details:', errorText);
-        console.error('[Profile API] Response headers:', Object.fromEntries(response.headers.entries()));
-        
+        console.error(
+          '[Profile API] Response headers:',
+          Object.fromEntries(response.headers.entries()),
+        );
+
         return NextResponse.json(
           {
             profile: {
               userId: session.user.id,
               name: session.user.name || session.user.email || 'User',
               email: session.user.email,
-              summary: 'No profile data available yet. Start chatting to build your profile!',
+              summary:
+                'No profile data available yet. Start chatting to build your profile!',
               memories: [],
             },
           },
-          { status: 200 }
+          { status: 200 },
         );
       }
 
       const data = await response.json();
-      console.log('[Profile API] Supermemory response:', JSON.stringify(data, null, 2));
-      
+      console.log(
+        '[Profile API] Supermemory response:',
+        JSON.stringify(data, null, 2),
+      );
+
       // Return the profile data exactly as Supermemory returns it
       const profile = data.profile || data;
-      
+
       const result = {
         userId: session.user.id,
         static: profile.static || [],
         dynamic: profile.dynamic || [],
       };
-      
-      console.log('[Profile API] Final profile result:', JSON.stringify(result, null, 2));
-      
+
+      console.log(
+        '[Profile API] Final profile result:',
+        JSON.stringify(result, null, 2),
+      );
+
       return NextResponse.json({ profile: result }, { status: 200 });
     } catch (fetchError) {
-      console.error('[Profile API] Error fetching from Supermemory:', fetchError);
-      
+      console.error(
+        '[Profile API] Error fetching from Supermemory:',
+        fetchError,
+      );
+
       // Return basic profile if Supermemory API fails
       return NextResponse.json(
         {
@@ -86,15 +105,14 @@ export async function GET(request: Request) {
             memories: [],
           },
         },
-        { status: 200 }
+        { status: 200 },
       );
     }
   } catch (error) {
     console.error('[Profile API] Error:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
-

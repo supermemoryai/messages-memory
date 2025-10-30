@@ -424,6 +424,10 @@ export default function App() {
       // No URL ID or invalid ID, and not mobile - select first conversation
       if (allConversations.length > 0) {
         setActiveConversation(allConversations[0].id);
+      } else {
+        // No conversations at all - automatically start a new chat
+        setIsNewConversation(true);
+        setActiveConversation(null);
       }
     };
 
@@ -832,19 +836,13 @@ export default function App() {
   const handleClearChat = useCallback(() => {
     if (!activeConversation) return;
 
-    // Generate a new chat ID for the fresh start
-    const newChatId = generateUUID();
-
-    // Update localStorage with the new chat ID
-    localStorage.setItem(CHAT_ID_KEY, newChatId);
-
-    // Update the conversation with new ID and cleared messages
+    // Clear messages while keeping the same conversation ID
+    // This avoids race conditions and maintains conversation continuity
     setConversations((prevConversations) =>
       prevConversations.map((conv) =>
         conv.id === activeConversation
           ? {
               ...conv,
-              id: newChatId,
               messages: [],
               lastMessageTime: new Date().toISOString(),
             }
@@ -852,11 +850,8 @@ export default function App() {
       ),
     );
 
-    // Update active conversation to the new ID
-    setActiveConversation(newChatId);
-
-    // Update the URL to reflect the new chat ID
-    window.history.pushState({}, '', `?id=${newChatId}`);
+    // No need to update activeConversation or URL since the ID stays the same
+    // This ensures the ChatArea component always has a valid activeConversation
   }, [activeConversation]);
 
   // Handle sound toggle

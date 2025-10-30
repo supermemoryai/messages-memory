@@ -142,6 +142,57 @@ export async function POST(request: Request) {
     const containerTag = session.user.id;
     console.log('[Chat API] Using container tag:', containerTag);
 
+    // Check if user has existing memories to determine if they're new
+    let isNewUser = true;
+
+    // Only check for existing memories if this is the first message in a new conversation
+    if (previousMessages.length === 0) {
+      try {
+        console.log(
+          '[Chat API] Checking for existing memories for user:',
+          containerTag,
+        );
+        const profileResponse = await fetch(
+          'https://api.supermemory.ai/v4/profile',
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${supermemoryApiKey}`,
+            },
+            body: JSON.stringify({
+              containerTag: containerTag,
+            }),
+          },
+        );
+
+        if (profileResponse.ok) {
+          const profileData = await profileResponse.json();
+          // If profile exists and has content, user is not new
+          if (profileData?.profile.length > 0) {
+            isNewUser = false;
+            console.log(
+              '[Chat API] User has existing memories, not a new user',
+            );
+          } else {
+            console.log(
+              '[Chat API] No existing memories found, treating as new user',
+            );
+          }
+        }
+      } catch (error) {
+        console.error(
+          '[Chat API] Error checking for existing memories:',
+          error,
+        );
+        // Default to treating as existing user if check fails to avoid unnecessary onboarding
+        isNewUser = false;
+      }
+    } else {
+      // If there are previous messages in this conversation, definitely not a new user
+      isNewUser = false;
+    }
+
     // Create tools
     const memoryTools = createMemoryTools(supermemoryApiKey, containerTag);
     const webSearchTool = createWebSearchTool(exaApiKey);
@@ -176,7 +227,7 @@ export async function POST(request: Request) {
 
     const result = streamText({
       model: modelWithMemory,
-      system: systemPrompt({ selectedChatModel, requestHints }),
+      system: systemPrompt({ selectedChatModel, requestHints, isNewUser }),
       messages: convertedMessages,
       tools: toolsConfig,
       stopWhen: stepCountIs(3), // Allows up to 3 steps for tool calls and responses
