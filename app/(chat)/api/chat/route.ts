@@ -22,6 +22,8 @@ import { geolocation } from '@vercel/functions';
 import { ChatSDKError } from '@/lib/errors';
 
 export const maxDuration = 60;
+const REACTION_MARKER_REGEX =
+  /<<\s*react\s*:\s*(heart|like|dislike|laugh|emphasize|question)\s*>>/gi;
 
 export async function POST(request: Request) {
   let requestBody: PostRequestBody;
@@ -235,8 +237,13 @@ export async function POST(request: Request) {
       onFinish: async ({ text, steps }) => {
         if (session.user?.id) {
           try {
+            const cleanedText = text.replace(REACTION_MARKER_REGEX, '').trim();
+            if (!cleanedText) {
+              return;
+            }
+
             // Check if the response contains split delimiter
-            const splitMessages = text
+            const splitMessages = cleanedText
               .split('<SPLIT>')
               .map((t) => t.trim())
               .filter((t) => t.length > 0);
@@ -264,7 +271,7 @@ export async function POST(request: Request) {
                     id: generateUUID(),
                     chatId: id,
                     role: 'assistant',
-                    parts: [{ type: 'text', text }],
+                    parts: [{ type: 'text', text: cleanedText }],
                     attachments: [],
                     createdAt: new Date(),
                   },

@@ -1,4 +1,4 @@
-import type { Conversation, Message } from "../types";
+import type { Conversation, Message, Reaction, ReactionType } from "../types";
 
 // Represents a task in the message queue
 type MessageTask = {
@@ -209,16 +209,40 @@ export class MessageQueue {
         }
       }
 
-      // Create final message with accumulated text
-      const newMessage: Message = {
-        id: newMessageId,
-        content: accumulatedText,
-        sender: "Supermemory",
-        timestamp: new Date().toISOString(),
-      };
+      const reactionRegex = /<<\s*react\s*:\s*(heart|like|dislike|laugh|emphasize|question)\s*>>/gi;
+      const reactionMatches = Array.from(accumulatedText.matchAll(reactionRegex));
 
-      // Notify of new message
-      this.callbacks.onMessageGenerated(task.conversation.id, newMessage);
+      if (reactionMatches.length > 0 && lastUserMessage) {
+        accumulatedText = accumulatedText.replace(reactionRegex, '').trim();
+
+        const reactionSender =
+          task.conversation.recipients?.[0]?.name ?? "Supermemory";
+        const reactions: Reaction[] = reactionMatches.map(match => ({
+          type: match[1].toLowerCase() as ReactionType,
+          sender: reactionSender,
+          timestamp: new Date().toISOString(),
+        }));
+
+        this.callbacks.onMessageUpdated?.(task.conversation.id, lastUserMessage.id, {
+          reactions,
+        });
+      }
+
+      accumulatedText = accumulatedText.trim();
+
+      if (accumulatedText.length > 0) {
+        // Create final message with accumulated text
+        const newMessage: Message = {
+          id: newMessageId,
+          content: accumulatedText,
+          sender:
+            task.conversation.recipients?.[0]?.name ?? "Supermemory",
+          timestamp: new Date().toISOString(),
+        };
+
+        // Notify of new message
+        this.callbacks.onMessageGenerated(task.conversation.id, newMessage);
+      }
 
       // Clear typing status
       this.callbacks.onTypingStatusChange(null, null);

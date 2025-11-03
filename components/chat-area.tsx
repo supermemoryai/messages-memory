@@ -72,8 +72,49 @@ export function ChatArea({
   const [submittedForm, setSubmittedForm] = useState<boolean>(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [activeReactionTarget, setActiveReactionTarget] = useState<{
+    messageId: string;
+    splitIndex?: number;
+  } | null>(null);
   const { theme, systemTheme } = useTheme();
   const effectiveTheme = theme === 'system' ? systemTheme : theme;
+  const currentReactionActor = 'me';
+
+  // Helper to determine which actor identifier should be used when creating/checking reactions.
+  // For now, UI reactions are attributed to the current user ("me"). Change this if you use a different actor id.
+  const getReactionActorForMessage = (_sender: string) => {
+    return currentReactionActor;
+  };
+
+  const isReactionMenuOpen = (
+    messageId: string,
+    splitIndex?: number,
+  ): boolean => {
+    return (
+      activeReactionTarget?.messageId === messageId &&
+      (activeReactionTarget?.splitIndex ?? null) === (splitIndex ?? null)
+    );
+  };
+
+  const closeReactionMenu = () => {
+    setActiveReactionTarget(null);
+  };
+
+  const openReactionMenu = (messageId: string, splitIndex?: number) => {
+    setActiveReactionTarget({ messageId, splitIndex });
+  };
+
+  const handleReactionMenuToggle = (
+    open: boolean,
+    messageId: string,
+    splitIndex?: number,
+  ) => {
+    if (open) {
+      openReactionMenu(messageId, splitIndex);
+    } else if (isReactionMenuOpen(messageId, splitIndex)) {
+      closeReactionMenu();
+    }
+  };
 
   // Reaction icon mappings
   const menuReactionIcons = {
@@ -150,6 +191,7 @@ export function ChatArea({
   const isReactionActive = (
     message: any,
     type: ReactionType,
+    actor: string,
     splitIndex?: number,
     hasSplits?: boolean,
   ) => {
@@ -157,7 +199,7 @@ export function ChatArea({
       message.reactions?.some(
         (r: Reaction) =>
           r.type === type &&
-          r.sender === 'me' &&
+          r.sender === actor &&
           // Check splitIndex if message has splits
           (!hasSplits ||
             r.splitIndex === splitIndex ||
@@ -180,6 +222,10 @@ export function ChatArea({
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [activeConversation?.messages]);
+
+  useEffect(() => {
+    setActiveReactionTarget(null);
+  }, [conversationId]);
 
   useEffect(() => {
     if (
@@ -296,6 +342,11 @@ export function ChatArea({
                   index < activeConversation.messages.length - 1
                     ? activeConversation.messages[index + 1]
                     : null;
+                const reactionSplitIndex =
+                  contentParts.length > 1 ? splitIndex : undefined;
+                const reactionActor = getReactionActorForMessage(
+                  message.sender,
+                );
 
                 // First in group if: first split part AND (first message OR different sender from prev)
                 const isFirstInGroup =
@@ -379,10 +430,23 @@ export function ChatArea({
                         <div className="relative">
                           {/* Only show Popover for reactions if message doesn't have a form or form was submitted */}
                           {!message.form || submittedForm ? (
-                            <Popover>
+                            <Popover
+                              open={isReactionMenuOpen(
+                                message.id,
+                                reactionSplitIndex,
+                              )}
+                              onOpenChange={(open) =>
+                                handleReactionMenuToggle(
+                                  open,
+                                  message.id,
+                                  reactionSplitIndex,
+                                )
+                              }
+                            >
                               <PopoverTrigger asChild>
                                 <button
                                   type="button"
+                                  disabled={isProfileChat}
                                   className={cn(
                                     'max-w-[280px] sm:max-w-md px-3.5 py-2 text-[17px] leading-[22px] break-words text-left',
                                     isMe
@@ -448,7 +512,7 @@ export function ChatArea({
                                           message.id,
                                           {
                                             type: type as ReactionType,
-                                            sender: 'me',
+                                            sender: reactionActor,
                                             timestamp: new Date().toISOString(),
                                             splitIndex:
                                               contentParts.length > 1
@@ -459,17 +523,17 @@ export function ChatArea({
                                             ? splitIndex
                                             : undefined,
                                         );
+                                        closeReactionMenu();
                                       }}
                                       className={cn(
-                                        'inline-flex items-center justify-center rounded-full w-8 h-8 aspect-square p-0 cursor-pointer text-base transition-all duration-200 ease-out text-gray-500 hover:scale-125 flex-shrink-0',
+                                        'inline-flex items-center justify-center rounded-full w-7 h-7 aspect-square p-0 cursor-pointer text-sm transition-colors duration-200 ease-out text-gray-500 flex-shrink-0',
                                         isReactionActive(
                                           message,
                                           type as ReactionType,
+                                          reactionActor,
                                           splitIndex,
                                           contentParts.length > 1,
-                                        )
-                                          ? 'bg-[#0A7CFF] text-white scale-110'
-                                          : '',
+                                        ) && 'bg-[#0A7CFF] text-white',
                                       )}
                                     >
                                       <Image
@@ -477,6 +541,7 @@ export function ChatArea({
                                           isReactionActive(
                                             message,
                                             type as ReactionType,
+                                            reactionActor,
                                             splitIndex,
                                             contentParts.length > 1,
                                           )
@@ -485,14 +550,14 @@ export function ChatArea({
                                                 .replace('-dark', '-white')
                                             : icon
                                         }
-                                        width={16}
-                                        height={16}
+                                        width={14}
+                                        height={14}
                                         alt={`${type} reaction`}
                                         style={
                                           type === 'emphasize'
-                                            ? { transform: 'scale(0.75)' }
+                                            ? { transform: 'scale(0.82)' }
                                             : type === 'question'
-                                              ? { transform: 'scale(0.6)' }
+                                              ? { transform: 'scale(0.58)' }
                                               : undefined
                                         }
                                       />
@@ -571,9 +636,10 @@ export function ChatArea({
                             message.reactions.length > 0 && (
                               <div
                                 className={cn(
-                                  'absolute -top-8 flex',
-                                  isMe ? '-left-8' : '-right-8',
-                                  isMe ? 'flex-row' : 'flex-row-reverse',
+                                  'absolute -top-10 flex',
+                                  isMe
+                                    ? 'left-0 flex-row'
+                                    : 'right-0 flex-row-reverse',
                                 )}
                               >
                                 {[...message.reactions]
@@ -594,9 +660,9 @@ export function ChatArea({
                                     <div
                                       key={`${reaction.type}-${reaction.timestamp}`}
                                       className={cn(
-                                        'w-8 h-8 flex items-center justify-center text-sm relative cursor-pointer',
+                                        'w-10 h-10 flex items-center justify-center text-sm relative cursor-pointer',
                                         index !== array.length - 1 &&
-                                          (isMe ? '-mr-7' : '-ml-7'),
+                                          (isMe ? '-ml-9' : '-mr-9'),
                                       )}
                                       style={{
                                         ...getReactionStyle(
@@ -617,8 +683,8 @@ export function ChatArea({
                                               isMobileView ?? false,
                                               true,
                                             )}
-                                            width={32}
-                                            height={32}
+                                            width={36}
+                                            height={36}
                                             alt={`${reaction.type} reaction`}
                                             className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10"
                                           />
@@ -751,6 +817,8 @@ export function ChatArea({
             const isNewMessage =
               new Date().getTime() - new Date(message.timestamp).getTime() <
               2000;
+            const reactionSplitIndex = hasSplits ? splitIndex : undefined;
+            const reactionActor = getReactionActorForMessage(message.sender);
 
             // Calculate staggered animation delay - messages appear one by one
             const baseDelay = 150; // Base delay between messages in ms
@@ -833,13 +901,24 @@ export function ChatArea({
 
                       {/* Message bubble container */}
                       <div className="relative">
-                        <Popover>
+                        <Popover
+                          open={isReactionMenuOpen(
+                            message.id,
+                            reactionSplitIndex,
+                          )}
+                          onOpenChange={(open) =>
+                            handleReactionMenuToggle(
+                              open,
+                              message.id,
+                              reactionSplitIndex,
+                            )
+                          }
+                        >
                           <PopoverTrigger asChild>
                             <button
                               className={cn(
                                 'px-4 py-2 rounded-2xl text-left break-words whitespace-pre-wrap relative',
                                 'transition-all duration-200',
-                                'hover:scale-[1.02] active:scale-[0.98]',
                                 isMe
                                   ? 'bg-[#0A7CFF] text-white ml-auto'
                                   : 'bg-gray-100 dark:bg-[#262729] text-gray-900 dark:text-gray-100',
@@ -879,7 +958,71 @@ export function ChatArea({
                               </div>
                             </button>
                           </PopoverTrigger>
-                          {/* Reaction menu popover content would go here */}
+                          <PopoverContent
+                            className="flex p-2 gap-2 w-fit rounded-full bg-gray-100 dark:bg-[#404040] z-50"
+                            align={isMe ? 'end' : 'start'}
+                            alignOffset={-8}
+                            side="top"
+                            sideOffset={20}
+                          >
+                            {Object.entries(menuReactionIcons).map(
+                              ([type, icon]) => (
+                                <button
+                                  key={type}
+                                  type="button"
+                                  onClick={() => {
+                                    onReaction?.(
+                                      message.id,
+                                      {
+                                        type: type as ReactionType,
+                                        sender: reactionActor,
+                                        timestamp: new Date().toISOString(),
+                                        splitIndex: reactionSplitIndex,
+                                      },
+                                      reactionSplitIndex,
+                                    );
+                                    closeReactionMenu();
+                                  }}
+                                  className={cn(
+                                    'inline-flex items-center justify-center rounded-full w-7 h-7 aspect-square p-0 cursor-pointer text-sm transition-colors duration-200 ease-out text-gray-500 flex-shrink-0',
+                                    isReactionActive(
+                                      message,
+                                      type as ReactionType,
+                                      reactionActor,
+                                      reactionSplitIndex,
+                                      hasSplits,
+                                    ) && 'bg-[#0A7CFF] text-white',
+                                  )}
+                                >
+                                  <Image
+                                    src={
+                                      isReactionActive(
+                                        message,
+                                        type as ReactionType,
+                                        reactionActor,
+                                        reactionSplitIndex,
+                                        hasSplits,
+                                      )
+                                        ? icon
+                                            .replace('-gray', '-white')
+                                            .replace('-dark', '-white')
+                                        : icon
+                                    }
+                                    width={14}
+                                    height={14}
+                                    alt={`${type} reaction`}
+                                    style={
+                                      type === 'emphasize'
+                                        ? { transform: 'scale(0.82)' }
+                                        : type === 'question'
+                                          ? { transform: 'scale(0.58)' }
+                                          : undefined
+                                    }
+                                  />
+                                </button>
+                              ),
+                            )}
+                          </PopoverContent>
                         </Popover>
                         {/* Render form if it exists and hasn't been submitted */}
                         {message.form && !submittedForm && (
@@ -909,11 +1052,13 @@ export function ChatArea({
                           ).length > 0 && (
                             <div
                               className={cn(
-                                'absolute -bottom-3 flex gap-0.5',
-                                isMe ? 'right-2' : 'left-2',
+                                'absolute -top-9 flex gap-1',
+                                isMe
+                                  ? 'left-0 flex-row'
+                                  : 'right-0 flex-row-reverse',
                               )}
                             >
-                              {message.reactions
+                              {[...message.reactions]
                                 .filter(
                                   (r) =>
                                     !hasSplits ||
@@ -921,12 +1066,44 @@ export function ChatArea({
                                     (r.splitIndex === undefined &&
                                       splitIndex === 0),
                                 )
-                                .map((reaction, idx) => (
+                                .sort(
+                                  (a, b) =>
+                                    new Date(a.timestamp).getTime() -
+                                    new Date(b.timestamp).getTime(),
+                                )
+                                .map((reaction, index, array) => (
                                   <div
-                                    key={`${reaction.type}-${reaction.sender}-${idx}`}
-                                    className="w-5 h-5 relative"
+                                    key={`${reaction.type}-${reaction.timestamp}`}
+                                    className={cn(
+                                      'w-8 h-8 flex items-center justify-center relative',
+                                      index !== array.length - 1 &&
+                                        (isMe ? '-ml-5' : '-mr-5'),
+                                    )}
+                                    style={{
+                                      ...getReactionStyle(
+                                        reaction,
+                                        isMe,
+                                        isMobileView ?? false,
+                                      ),
+                                      zIndex: array.length - index,
+                                    }}
                                   >
-                                    {/* Reaction icons would be rendered here */}
+                                    {reaction.sender === 'me' &&
+                                      !isMobileView && (
+                                        <Image
+                                          src={getReactionIconSvg(
+                                            reaction.sender === 'me',
+                                            isMe,
+                                            reaction.type,
+                                            isMobileView ?? false,
+                                            true,
+                                          )}
+                                          width={30}
+                                          height={30}
+                                          alt={`${reaction.type} reaction`}
+                                          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10"
+                                        />
+                                      )}
                                   </div>
                                 ))}
                             </div>
