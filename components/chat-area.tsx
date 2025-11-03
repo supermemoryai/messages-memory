@@ -446,7 +446,9 @@ export function ChatArea({
                               <PopoverTrigger asChild>
                                 <button
                                   type="button"
-                                  disabled={isProfileChat}
+                                  disabled={
+                                    isProfileChat || submittedForm === false
+                                  }
                                   className={cn(
                                     'max-w-[280px] sm:max-w-md px-3.5 py-2 text-[17px] leading-[22px] break-words text-left',
                                     isMe
@@ -916,6 +918,9 @@ export function ChatArea({
                         >
                           <PopoverTrigger asChild>
                             <button
+                              disabled={
+                                isProfileChat || submittedForm === false
+                              }
                               className={cn(
                                 'px-4 py-2 rounded-2xl text-left break-words whitespace-pre-wrap relative',
                                 'transition-all duration-200',
