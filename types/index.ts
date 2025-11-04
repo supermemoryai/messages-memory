@@ -39,6 +39,7 @@ export interface Conversation {
   pinned?: boolean;
   isTyping?: boolean;
   hideAlerts?: boolean;
+  isDraft?: boolean;
 }
 
 export interface Recipient {

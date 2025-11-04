@@ -11,10 +11,12 @@ import {
   getUserSpecificSupermemoryId,
   getUserSpecificProfileId,
 } from '../data/initial-conversations';
+import { createInitialContactsForUser } from '../data/initial-contacts';
 import { MessageQueue } from '../lib/message-queue';
 import { useToast } from '@/hooks/use-toast';
 import { CommandMenu } from './command-menu';
 import { soundEffects } from '@/lib/sound-effects';
+import { getUserContacts } from '@/lib/contacts';
 
 export default function App() {
   // State
@@ -30,6 +32,9 @@ export default function App() {
   >(null);
   const [messageDrafts, setMessageDrafts] = useState<Record<string, string>>(
     {},
+  );
+  const [draftConversationId, setDraftConversationId] = useState<string | null>(
+    null,
   );
   const [recipientInput, setRecipientInput] = useState('');
   const [isMobileView, setIsMobileView] = useState(false);
@@ -50,44 +55,332 @@ export default function App() {
   const STORAGE_KEY = 'supermemoryConversations';
   const CHAT_ID_KEY = 'supermemoryCurrentChatId';
 
+  const removeDraftConversation = useCallback(
+    (conversationId: string | null) => {
+      if (!conversationId) return;
+
+      let draftRemoved = false;
+      setConversations((prev) => {
+        const draft = prev.find(
+          (conv) => conv.id === conversationId && conv.isDraft,
+        );
+        if (!draft) {
+          return prev;
+        }
+        draftRemoved = true;
+        const updated = prev.filter((conv) => conv.id !== conversationId);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+        return updated;
+      });
+
+      if (draftRemoved) {
+        setMessageDrafts((prev) => {
+          if (!(conversationId in prev)) {
+            return prev;
+          }
+          const { [conversationId]: _, ...rest } = prev;
+          return rest;
+        });
+        setDraftConversationId((current) =>
+          current === conversationId ? null : current,
+        );
+      }
+    },
+    [STORAGE_KEY],
+  );
+
+  const startNewConversation = useCallback((
+    options?: { baseConversation?: Conversation }
+  ) => {
+    if (draftConversationId) {
+      removeDraftConversation(draftConversationId);
+    }
+
+    const newConversationId = generateUUID();
+    const now = new Date().toISOString();
+    const baseConversation = options?.baseConversation;
+
+    const baseRecipients =
+      baseConversation?.recipients?.map((recipient) => ({ ...recipient })) || [];
+    const conversationName =
+      baseConversation?.name ||
+      (baseRecipients.length > 0
+        ? baseRecipients.map((recipient) => recipient.name).join(', ')
+        : 'New Chat');
+
+    const newConversation: Conversation = {
+      id: newConversationId,
+      name: conversationName,
+      recipients: baseRecipients,
+      messages: [],
+      lastMessageTime: now,
+      unreadCount: 0,
+      isDraft: baseRecipients.length === 0,
+      pinned: baseConversation?.pinned,
+      hideAlerts: baseConversation?.hideAlerts,
+    };
+
+    setConversations((prev) => {
+      const filtered = baseConversation
+        ? prev.filter((conv) => conv.id !== baseConversation.id)
+        : prev;
+      const updated = [newConversation, ...filtered];
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      return updated;
+    });
+
+    setDraftConversationId(
+      baseRecipients.length === 0 ? newConversationId : null,
+    );
+    setActiveConversation(newConversationId);
+    setIsNewConversation(baseRecipients.length === 0);
+    setRecipientInput(
+      baseRecipients.length > 0
+        ? baseRecipients.map((recipient) => recipient.name).join(',')
+        : '',
+    );
+    setMessageDrafts((prev) => {
+      const { new: _unusedDraft, ...restWithoutNew } = prev;
+      let cleanedDrafts = restWithoutNew;
+      if (baseConversation) {
+        const { [baseConversation.id]: _removed, ...withoutBase } = cleanedDrafts;
+        cleanedDrafts = withoutBase;
+      }
+      return {
+        ...cleanedDrafts,
+        [newConversationId]: '',
+      };
+    });
+    if (baseConversation) {
+      setLastActiveConversation((prev) =>
+        prev === baseConversation.id ? newConversationId : prev,
+      );
+      localStorage.setItem(CHAT_ID_KEY, newConversationId);
+    }
+    localStorage.setItem('submittedForm', `submitted-${newConversationId}`);
+    window.history.pushState({}, '', `?id=${newConversationId}`);
+  }, [
+    STORAGE_KEY,
+    CHAT_ID_KEY,
+    draftConversationId,
+    removeDraftConversation,
+    setIsNewConversation,
+    setRecipientInput,
+  ]);
+
+  const buildRecipientsForConversation = useCallback(
+    (
+      existingConversation: Conversation | undefined,
+      recipientNames: string[],
+    ) => {
+      const trimmed = recipientNames
+        .map((name) => name.trim())
+        .filter((name) => name.length > 0);
+
+      const initialContacts = createInitialContactsForUser(userId || 'default');
+      const userContacts = getUserContacts();
+      const contactMap = new Map(
+        [...initialContacts, ...userContacts].map((contact) => [
+          contact.name.toLowerCase(),
+          contact,
+        ]),
+      );
+
+      return trimmed.map((name) => {
+        const existingRecipient = existingConversation?.recipients.find(
+          (recipient) => recipient.name.toLowerCase() === name.toLowerCase(),
+        );
+
+        if (existingRecipient) {
+          return existingRecipient;
+        }
+
+        const contact = contactMap.get(name.toLowerCase());
+        return {
+          id: generateUUID(),
+          name,
+          avatar: contact?.avatar,
+          bio: contact?.bio,
+          title: contact?.title,
+        };
+      });
+    },
+    [userId],
+  );
+
+  const handleCreateConversation = useCallback(
+    (recipientNames: string[]) => {
+      const trimmedRecipients = recipientNames
+        .map((name) => name.trim())
+        .filter((name) => name.length > 0);
+
+      if (trimmedRecipients.length === 0) {
+        return;
+      }
+
+      let candidateConversationId: string;
+      if (
+        draftConversationId &&
+        conversations.some((conv) => conv.id === draftConversationId)
+      ) {
+        candidateConversationId = draftConversationId;
+      } else if (
+        activeConversation &&
+        conversations.some((conv) => conv.id === activeConversation)
+      ) {
+        candidateConversationId = activeConversation;
+      } else {
+        candidateConversationId = generateUUID();
+      }
+
+      setConversations((prev) => {
+        const now = new Date().toISOString();
+        const index = prev.findIndex(
+          (conv) => conv.id === candidateConversationId,
+        );
+
+        if (index !== -1) {
+          const existing = prev[index];
+          const recipients = buildRecipientsForConversation(
+            existing,
+            trimmedRecipients,
+          );
+          const updatedConversation: Conversation = {
+            ...existing,
+            recipients,
+            name: trimmedRecipients.join(', '),
+            isDraft: false,
+            lastMessageTime: existing.lastMessageTime || now,
+          };
+          const updated = [...prev];
+          updated[index] = updatedConversation;
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+          return updated;
+        }
+
+        const recipients = buildRecipientsForConversation(
+          undefined,
+          trimmedRecipients,
+        );
+        const newConversation: Conversation = {
+          id: candidateConversationId,
+          recipients,
+          name: trimmedRecipients.join(', '),
+          messages: [],
+          lastMessageTime: now,
+          unreadCount: 0,
+          isDraft: false,
+        };
+        const updated = [newConversation, ...prev];
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+        return updated;
+      });
+
+      setMessageDrafts((prev) => {
+        if (prev.new === undefined) {
+          return prev;
+        }
+        const { new: draftValue, ...rest } = prev;
+        return {
+          ...rest,
+          [candidateConversationId]: draftValue,
+        };
+      });
+
+      setActiveConversation(candidateConversationId);
+      setDraftConversationId(null);
+      setIsNewConversation(false);
+      setRecipientInput(trimmedRecipients.join(','));
+      window.history.pushState({}, '', `?id=${candidateConversationId}`);
+    },
+    [
+      STORAGE_KEY,
+      activeConversation,
+      buildRecipientsForConversation,
+      conversations,
+      draftConversationId,
+    ],
+  );
+
+  const handleUpdateRecipients = useCallback(
+    (recipientNames: string[]) => {
+      if (!activeConversation) return;
+
+      const trimmedRecipients = recipientNames
+        .map((name) => name.trim())
+        .filter((name) => name.length > 0);
+
+      if (trimmedRecipients.length === 0) {
+        return;
+      }
+
+      setConversations((prev) => {
+        const index = prev.findIndex((conv) => conv.id === activeConversation);
+        if (index === -1) {
+          return prev;
+        }
+        const existing = prev[index];
+        const recipients = buildRecipientsForConversation(
+          existing,
+          trimmedRecipients,
+        );
+        const updatedConversation: Conversation = {
+          ...existing,
+          recipients,
+          name: trimmedRecipients.join(', '),
+        };
+        const updated = [...prev];
+        updated[index] = updatedConversation;
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+        return updated;
+      });
+    },
+    [STORAGE_KEY, activeConversation, buildRecipientsForConversation],
+  );
+
   // Memoized conversation selection method
   const selectConversation = useCallback(
     (conversationId: string | null) => {
-      // If clearing the selection
       if (conversationId === null) {
+        if (draftConversationId) {
+          removeDraftConversation(draftConversationId);
+        }
         setActiveConversation(null);
+        setIsNewConversation(false);
         window.history.pushState({}, '', '/');
         return;
       }
 
-      // Find the conversation in the list
+      if (draftConversationId && conversationId !== draftConversationId) {
+        removeDraftConversation(draftConversationId);
+      }
+
       const selectedConversation = conversations.find(
         (conversation) => conversation.id === conversationId,
       );
 
-      // If conversation is not found, handle gracefully
       if (!selectedConversation) {
         console.warn(`Conversation with ID ${conversationId} not found`);
 
-        // Clear URL and select first available conversation
         window.history.pushState({}, '', '/');
 
         if (conversations.length > 0) {
           const fallbackConversation = conversations[0];
           setActiveConversation(fallbackConversation.id);
+          setIsNewConversation(fallbackConversation.isDraft ?? false);
           window.history.pushState({}, '', `?id=${fallbackConversation.id}`);
         } else {
           setActiveConversation(null);
+          setIsNewConversation(false);
         }
         return;
       }
 
-      // Successfully select the conversation
       setActiveConversation(conversationId);
-      setIsNewConversation(false);
+      setIsNewConversation(selectedConversation.isDraft ?? false);
       window.history.pushState({}, '', `?id=${conversationId}`);
     },
-    [conversations, setActiveConversation, setIsNewConversation],
+    [conversations, draftConversationId, removeDraftConversation],
   );
 
   // Effects
@@ -426,14 +719,13 @@ export default function App() {
         setActiveConversation(allConversations[0].id);
       } else {
         // No conversations at all - automatically start a new chat
-        setIsNewConversation(true);
-        setActiveConversation(null);
+        startNewConversation();
       }
     };
 
     // Call the async initialization function
     initializeConversations();
-  }, [userId, isMobileView]); // Add userId as dependency
+  }, [userId, isMobileView, startNewConversation]); // Add userId as dependency
 
   // Update lastActiveConversation whenever activeConversation changes
   useEffect(() => {
@@ -667,6 +959,7 @@ export default function App() {
       messages: [...conversation.messages, message],
       lastMessageTime: new Date().toISOString(),
       unreadCount: 0,
+      isDraft: false,
     };
 
     setConversations((prev) => {
@@ -679,6 +972,9 @@ export default function App() {
 
     setActiveConversation(targetConversationId);
     setIsNewConversation(false);
+    setDraftConversationId((current) =>
+      current === targetConversationId ? null : current,
+    );
     window.history.pushState({}, '', `?id=${targetConversationId}`);
     messageQueue.current.enqueueUserMessage(updatedConversation);
     clearMessageDraft(targetConversationId);
@@ -764,9 +1060,10 @@ export default function App() {
             if (message.id === messageId) {
               // Check if this exact reaction already exists (including splitIndex)
               const existingReaction = message.reactions?.find(
-                (r) => r.sender === reaction.sender &&
-                       r.type === reaction.type &&
-                       r.splitIndex === splitIndex,
+                (r) =>
+                  r.sender === reaction.sender &&
+                  r.type === reaction.type &&
+                  r.splitIndex === splitIndex,
               );
 
               if (existingReaction) {
@@ -787,7 +1084,11 @@ export default function App() {
                 // Remove any other reaction from this sender for this split and add the new one
                 const otherReactions =
                   message.reactions?.filter(
-                    (r) => !(r.sender === reaction.sender && r.splitIndex === splitIndex),
+                    (r) =>
+                      !(
+                        r.sender === reaction.sender &&
+                        r.splitIndex === splitIndex
+                      ),
                   ) || [];
                 return {
                   ...message,
@@ -865,6 +1166,8 @@ export default function App() {
     return total + (conv.unreadCount || 0);
   }, 0);
 
+  const resolvedConversationId = activeConversation || draftConversationId;
+
   // Don't render until layout is initialized
   if (!isLayoutInitialized) {
     return null;
@@ -877,9 +1180,8 @@ export default function App() {
         conversations={conversations}
         activeConversation={activeConversation}
         onNewChat={() => {
-          setIsNewConversation(true);
-          setActiveConversation(null);
-          window.history.pushState({}, '', '/');
+          startNewConversation();
+          commandMenuRef.current?.setOpen(false);
         }}
         onSelectConversation={selectConversation}
         onDeleteConversation={handleDeleteConversation}
@@ -914,12 +1216,7 @@ export default function App() {
               onSoundToggle={handleSoundToggle}
             >
               <Nav
-                onNewChat={() => {
-                  setIsNewConversation(true);
-                  selectConversation(null);
-                  setRecipientInput('');
-                  handleMessageDraftChange('new', '');
-                }}
+                onNewChat={startNewConversation}
                 isMobileView={isMobileView}
                 isScrolled={isScrolled}
               />
@@ -946,17 +1243,20 @@ export default function App() {
                 setIsNewConversation(false);
                 selectConversation(null);
               }}
+              onStartNewConversation={startNewConversation}
+              onCreateConversation={handleCreateConversation}
+              onUpdateRecipients={handleUpdateRecipients}
               onSendMessage={handleSendMessage}
               onReaction={handleReaction}
               typingStatus={typingStatus}
-              conversationId={activeConversation || ''}
+              conversationId={resolvedConversationId || ''}
               onUpdateConversationName={handleUpdateConversationName}
               onHideAlertsChange={handleHideAlertsChange}
               onClearChat={handleClearChat}
               messageDraft={
-                isNewConversation
-                  ? messageDrafts.new || ''
-                  : messageDrafts[activeConversation || ''] || ''
+                resolvedConversationId
+                  ? messageDrafts[resolvedConversationId] || ''
+                  : ''
               }
               onMessageDraftChange={handleMessageDraftChange}
               unreadCount={totalUnreadCount}
