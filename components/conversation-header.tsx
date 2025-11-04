@@ -34,6 +34,7 @@ interface ConversationHeaderProps {
   activeConversation?: Conversation;
   onUpdateRecipients?: (recipientNames: string[]) => void;
   onCreateConversation?: (recipientNames: string[]) => void;
+  onStartNewConversation?: (baseConversation: Conversation) => void;
   onUpdateConversationName?: (name: string) => void;
   onHideAlertsChange?: (hide: boolean) => void;
   unreadCount?: number;
@@ -287,6 +288,7 @@ export function ConversationHeader({
   activeConversation,
   onUpdateRecipients,
   onCreateConversation,
+  onStartNewConversation,
   onUpdateConversationName,
   onHideAlertsChange,
   unreadCount,
@@ -635,6 +637,9 @@ export function ConversationHeader({
       if (response.ok) {
         if (onClearChat) {
           onClearChat();
+        }
+        if (onStartNewConversation) {
+          onStartNewConversation(activeConversation);
         }
 
         toast({
