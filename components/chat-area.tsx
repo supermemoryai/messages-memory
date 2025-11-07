@@ -31,6 +31,9 @@ interface ChatAreaProps {
     conversationId?: string,
     attachments?: Attachment[],
   ) => void;
+  onStartNewConversation?: (options?: { baseConversation?: Conversation }) => void;
+  onCreateConversation?: (recipientNames: string[]) => void;
+  onUpdateRecipients?: (recipientNames: string[]) => void;
   onReaction?: (
     messageId: string,
     reaction: Reaction,
@@ -56,6 +59,9 @@ export function ChatArea({
   isMobileView,
   onBack,
   onSendMessage,
+  onStartNewConversation,
+  onCreateConversation,
+  onUpdateRecipients,
   onReaction,
   typingStatus,
   conversationId,
@@ -280,17 +286,25 @@ export function ChatArea({
         <div className="w-1/2 h-full relative">
           {/* Header with recipient management */}
           <div className="absolute top-0 left-0 right-0 z-50">
-            <ConversationHeader
-              isNewChat={isNewChat}
-              recipientInput={recipientInput}
-              setRecipientInput={setRecipientInput}
-              onBack={onBack}
-              isMobileView={isMobileView}
-              activeConversation={activeConversation}
-              onUpdateConversationName={onUpdateConversationName}
-              onHideAlertsChange={onHideAlertsChange}
-              onClearChat={onClearChat}
-              userId={userId}
+          <ConversationHeader
+            isNewChat={isNewChat}
+            recipientInput={recipientInput}
+            setRecipientInput={setRecipientInput}
+            onBack={onBack}
+            isMobileView={isMobileView}
+            activeConversation={activeConversation}
+            onStartNewConversation={
+              onStartNewConversation
+                ? (conversation) =>
+                    onStartNewConversation({ baseConversation: conversation })
+                : undefined
+            }
+            onCreateConversation={onCreateConversation}
+            onUpdateRecipients={onUpdateRecipients}
+            onUpdateConversationName={onUpdateConversationName}
+            onHideAlertsChange={onHideAlertsChange}
+            onClearChat={onClearChat}
+            userId={userId}
             />
           </div>
 
@@ -764,6 +778,14 @@ export function ChatArea({
           onBack={onBack}
           isMobileView={isMobileView}
           activeConversation={activeConversation}
+          onStartNewConversation={
+            onStartNewConversation
+              ? (conversation) =>
+                  onStartNewConversation({ baseConversation: conversation })
+              : undefined
+          }
+          onCreateConversation={onCreateConversation}
+          onUpdateRecipients={onUpdateRecipients}
           onUpdateConversationName={onUpdateConversationName}
           onHideAlertsChange={onHideAlertsChange}
           onClearChat={onClearChat}

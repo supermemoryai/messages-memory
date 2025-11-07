@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import type { Session } from 'next-auth';
 import { useRouter } from 'next/navigation';
 import type { UIMessage } from 'ai';
@@ -32,6 +31,23 @@ export function ChatHeader({
   onChatIdChange,
 }: ChatHeaderProps) {
   const router = useRouter();
+  const handleStartNewChat = () => {
+    const newChatId = generateUUID();
+
+    // Persist the new chat ID for future sessions
+    localStorage.setItem('supermemoryCurrentChatId', newChatId);
+
+    // Clear local UI state
+    setMessages([]);
+
+    // Notify parent components if they need to react to the chat ID change
+    if (onChatIdChange) {
+      onChatIdChange(newChatId);
+    }
+
+    // Navigate to the new chat
+    router.push(`/?id=${newChatId}`);
+  };
 
   const handleClearChat = async () => {
     const confirmClear = window.confirm('Are you sure you want to clear this chat? This will start a new conversation with a fresh history.');
@@ -102,13 +118,12 @@ export function ChatHeader({
         )}
         <Button
           variant="outline"
-          asChild
           className="hidden md:flex md:px-2 md:h-[34px]"
+          onClick={handleStartNewChat}
         >
-          <Link href="/">New Chat</Link>
+          New Chat
         </Button>
       </div>
     </header>
   );
 }
-
