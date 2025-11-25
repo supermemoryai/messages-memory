@@ -1,11 +1,16 @@
-'use client';
+"use client";
 
-import { useState, useCallback } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { MemoryGraph } from '@/lib/ui/memory-graph';
-import { Button } from '@/components/ui/button';
-import { Network } from 'lucide-react';
-import type { DocumentWithMemories } from '@/lib/types/supermemory';
+import { useState, useCallback } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { MemoryGraph } from "@supermemory/memory-graph";
+import { Button } from "@/components/ui/button";
+import { Network } from "lucide-react";
+import type { DocumentWithMemories } from "@/lib/types/supermemory";
 
 interface MemoryGraphDialogProps {
   open?: boolean;
@@ -16,7 +21,7 @@ interface MemoryGraphDialogProps {
 export function MemoryGraphDialog({
   open: controlledOpen,
   onOpenChange: controlledOnOpenChange,
-  triggerButton = false
+  triggerButton = false,
 }: MemoryGraphDialogProps) {
   const [internalOpen, setInternalOpen] = useState(false);
   const [documents, setDocuments] = useState<DocumentWithMemories[]>([]);
@@ -32,32 +37,35 @@ export function MemoryGraphDialog({
   const onOpenChange = controlledOnOpenChange || setInternalOpen;
 
   // Fetch documents when dialog opens
-  const fetchDocuments = useCallback(async (page: number, limit: number = 500) => {
-    try {
-      const response = await fetch('/api/documents', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          page,
-          limit,
-          sort: 'createdAt',
-          order: 'desc',
-        }),
-      });
+  const fetchDocuments = useCallback(
+    async (page: number, limit: number = 500) => {
+      try {
+        const response = await fetch("/api/documents", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            page,
+            limit,
+            sort: "createdAt",
+            order: "desc",
+          }),
+        });
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch documents');
+        if (!response.ok) {
+          throw new Error("Failed to fetch documents");
+        }
+
+        const data = await response.json();
+        return data;
+      } catch (err) {
+        console.error("Error fetching documents:", err);
+        throw err;
       }
-
-      const data = await response.json();
-      return data;
-    } catch (err) {
-      console.error('Error fetching documents:', err);
-      throw err;
-    }
-  }, []);
+    },
+    [],
+  );
 
   // Load initial documents
   const loadInitialDocuments = useCallback(async () => {
@@ -86,15 +94,15 @@ export function MemoryGraphDialog({
       const data = await fetchDocuments(nextPage, 100);
 
       if (data.documents && data.documents.length > 0) {
-        setDocuments(prev => [...prev, ...data.documents]);
-        setTotalLoaded(prev => prev + data.documents.length);
+        setDocuments((prev) => [...prev, ...data.documents]);
+        setTotalLoaded((prev) => prev + data.documents.length);
         setCurrentPage(nextPage);
         setHasMore(data.pagination.currentPage < data.pagination.totalPages);
       } else {
         setHasMore(false);
       }
     } catch (err) {
-      console.error('Error loading more documents:', err);
+      console.error("Error loading more documents:", err);
       // Don't set error state for pagination failures
     } finally {
       setIsLoadingMore(false);
@@ -102,12 +110,15 @@ export function MemoryGraphDialog({
   }, [currentPage, hasMore, isLoadingMore, fetchDocuments]);
 
   // Handle dialog open state change
-  const handleOpenChange = useCallback((newOpen: boolean) => {
-    onOpenChange(newOpen);
-    if (newOpen && documents.length === 0) {
-      loadInitialDocuments();
-    }
-  }, [onOpenChange, documents.length, loadInitialDocuments]);
+  const handleOpenChange = useCallback(
+    (newOpen: boolean) => {
+      onOpenChange(newOpen);
+      if (newOpen && documents.length === 0) {
+        loadInitialDocuments();
+      }
+    },
+    [onOpenChange, documents.length, loadInitialDocuments],
+  );
 
   // Render trigger button if requested
   if (triggerButton && !controlledOpen) {
