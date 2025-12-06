@@ -4,6 +4,7 @@ import { Application, extend } from "@pixi/react";
 import { Container as PixiContainer, Graphics as PixiGraphics } from "pixi.js";
 import { memo, useCallback, useEffect, useMemo, useRef } from "react";
 import { colors } from "./constants";
+import { getThemeColors } from "./theme-colors";
 import type { GraphCanvasProps, MemoryEntry } from "./types";
 
 // Register Pixi Graphics and Container so they can be used as JSX elements
@@ -32,7 +33,10 @@ export const GraphWebGLCanvas = memo<GraphCanvasProps>(
 		onTouchMove,
 		onTouchEnd,
 		draggingNodeId,
+		themeColors,
 	}) => {
+		// Use theme colors or fallback to dark theme
+		const colorPalette = themeColors || colors;
 		const containerRef = useRef<HTMLDivElement>(null);
 		const isPanningRef = useRef(false);
 		const currentHoveredRef = useRef<string | null>(null);
@@ -58,32 +62,40 @@ export const GraphWebGLCanvas = memo<GraphCanvasProps>(
 		// ---------- Zoom bucket (reduces redraw frequency) ----------
 		const zoomBucket = useMemo(() => Math.round(zoom * 4) / 4, [zoom]);
 
-		// Redraw layers only when their data changes ----------------------
-		useEffect(() => {
-			if (gridG.current) drawGrid(gridG.current);
-		}, [panX, panY, zoom, width, height]);
-
-		useEffect(() => {
-			if (edgesG.current) drawEdges(edgesG.current);
-		}, [edgesG.current, edges, nodes, zoomBucket]);
-
-		useEffect(() => {
-			if (docsG.current) drawDocuments(docsG.current);
-		}, [docsG.current, nodes, zoomBucket]);
-
-		useEffect(() => {
-			if (memsG.current) drawMemories(memsG.current);
-		}, [memsG.current, nodes, zoomBucket]);
-
-		// Apply pan & zoom via world transform instead of geometry rebuilds
-		useEffect(() => {
-			if (worldContainerRef.current) {
-				worldContainerRef.current.position.set(panX, panY);
-				worldContainerRef.current.scale.set(zoom);
+		/* ---------- Color parsing ---------- */
+		const toHexAlpha = (input: string): { hex: number; alpha: number } => {
+			if (!input) return { hex: 0xffffff, alpha: 1 };
+			const str = input.trim().toLowerCase();
+			// rgba() or rgb()
+			const rgbaMatch = str
+				.replace(/\s+/g, "")
+				.match(/rgba?\((\d+),(\d+),(\d+)(?:,(\d*\.?\d+))?\)/i);
+			if (rgbaMatch) {
+				const r = Number.parseInt(rgbaMatch[1] || "0");
+				const g = Number.parseInt(rgbaMatch[2] || "0");
+				const b = Number.parseInt(rgbaMatch[3] || "0");
+				const a =
+					rgbaMatch[4] !== undefined ? Number.parseFloat(rgbaMatch[4]) : 1;
+				return { hex: (r << 16) + (g << 8) + b, alpha: a };
 			}
-		}, [panX, panY, zoom]);
-
-		// No bitmap caching – nothing to clean up
+			// #rrggbb or #rrggbbaa
+			if (str.startsWith("#")) {
+				const hexBody = str.slice(1);
+				if (hexBody.length === 6) {
+					return { hex: Number.parseInt(hexBody, 16), alpha: 1 };
+				}
+				if (hexBody.length === 8) {
+					const rgb = Number.parseInt(hexBody.slice(0, 6), 16);
+					const aByte = Number.parseInt(hexBody.slice(6, 8), 16);
+					return { hex: rgb, alpha: aByte / 255 };
+				}
+			}
+			// 0xRRGGBB
+			if (str.startsWith("0x")) {
+				return { hex: Number.parseInt(str, 16), alpha: 1 };
+			}
+			return { hex: 0xffffff, alpha: 1 };
+		};
 
 		/* ---------- Helpers ---------- */
 		const getNodeAtPosition = useCallback(
@@ -128,8 +140,9 @@ export const GraphWebGLCanvas = memo<GraphCanvasProps>(
 			(g: PixiGraphics) => {
 				g.clear();
 
-				const gridColor = 0x94a3b8; // rgb(148,163,184)
-				const gridAlpha = 0.03;
+				// Use theme-aware grid color
+				const gridColorRGBA = colorPalette.grid?.line || "rgba(148, 163, 184, 0.03)";
+				const { hex: gridColor, alpha: gridAlpha } = toHexAlpha(gridColorRGBA);
 				const gridSpacing = 100 * zoom;
 
 				// panning offsets
@@ -153,43 +166,8 @@ export const GraphWebGLCanvas = memo<GraphCanvasProps>(
 				// Stroke to render grid lines
 				g.stroke();
 			},
-			[panX, panY, zoom, width, height],
+			[panX, panY, zoom, width, height, colorPalette],
 		);
-
-		/* ---------- Color parsing ---------- */
-		const toHexAlpha = (input: string): { hex: number; alpha: number } => {
-			if (!input) return { hex: 0xffffff, alpha: 1 };
-			const str = input.trim().toLowerCase();
-			// rgba() or rgb()
-			const rgbaMatch = str
-				.replace(/\s+/g, "")
-				.match(/rgba?\((\d+),(\d+),(\d+)(?:,(\d*\.?\d+))?\)/i);
-			if (rgbaMatch) {
-				const r = Number.parseInt(rgbaMatch[1] || "0");
-				const g = Number.parseInt(rgbaMatch[2] || "0");
-				const b = Number.parseInt(rgbaMatch[3] || "0");
-				const a =
-					rgbaMatch[4] !== undefined ? Number.parseFloat(rgbaMatch[4]) : 1;
-				return { hex: (r << 16) + (g << 8) + b, alpha: a };
-			}
-			// #rrggbb or #rrggbbaa
-			if (str.startsWith("#")) {
-				const hexBody = str.slice(1);
-				if (hexBody.length === 6) {
-					return { hex: Number.parseInt(hexBody, 16), alpha: 1 };
-				}
-				if (hexBody.length === 8) {
-					const rgb = Number.parseInt(hexBody.slice(0, 6), 16);
-					const aByte = Number.parseInt(hexBody.slice(6, 8), 16);
-					return { hex: rgb, alpha: aByte / 255 };
-				}
-			}
-			// 0xRRGGBB
-			if (str.startsWith("0x")) {
-				return { hex: Number.parseInt(str, 16), alpha: 1 };
-			}
-			return { hex: 0xffffff, alpha: 1 };
-		};
 
 		const drawDocuments = useCallback(
 			(g: PixiGraphics) => {
@@ -208,16 +186,16 @@ export const GraphWebGLCanvas = memo<GraphCanvasProps>(
 
 					// Choose colors similar to canvas version
 					const fill = node.isDragging
-						? colors.document.accent
+						? colorPalette.document.accent
 						: node.isHovered
-							? colors.document.secondary
-							: colors.document.primary;
+							? colorPalette.document.secondary
+							: colorPalette.document.primary;
 
 					const strokeCol = node.isDragging
-						? colors.document.glow
+						? colorPalette.document.glow
 						: node.isHovered
-							? colors.document.accent
-							: colors.document.border;
+							? colorPalette.document.accent
+							: colorPalette.document.border;
 
 					const { hex: fillHex, alpha: fillAlpha } = toHexAlpha(fill);
 					const { hex: strokeHex, alpha: strokeAlpha } = toHexAlpha(strokeCol);
@@ -255,7 +233,7 @@ export const GraphWebGLCanvas = memo<GraphCanvasProps>(
 					}
 				});
 			},
-			[nodes, zoom],
+			[nodes, zoom, colorPalette],
 		);
 
 		/* ---------- Memories layer ---------- */
@@ -290,27 +268,27 @@ export const GraphWebGLCanvas = memo<GraphCanvasProps>(
 							Date.now() - 1000 * 60 * 60 * 24;
 
 					// colours
-					let fillColor = colors.memory.primary;
-					let borderColor = colors.memory.border;
-					let glowColor = colors.memory.glow;
+					let fillColor = colorPalette.memory.primary;
+					let borderColor = colorPalette.memory.border;
+					let glowColor = colorPalette.memory.glow;
 
 					if (isForgotten) {
-						fillColor = colors.status.forgotten;
+						fillColor = colorPalette.status.forgotten;
 						borderColor = "rgba(220,38,38,0.3)";
 						glowColor = "rgba(220,38,38,0.2)";
 					} else if (expiringSoon) {
-						borderColor = colors.status.expiring;
-						glowColor = colors.accent.amber;
+						borderColor = colorPalette.status.expiring;
+						glowColor = colorPalette.accent.amber;
 					} else if (isNew) {
-						borderColor = colors.status.new;
-						glowColor = colors.accent.emerald;
+						borderColor = colorPalette.status.new;
+						glowColor = colorPalette.accent.emerald;
 					}
 
 					if (node.isDragging) {
-						fillColor = colors.memory.accent;
+						fillColor = colorPalette.memory.accent;
 						borderColor = glowColor;
 					} else if (node.isHovered) {
-						fillColor = colors.memory.secondary;
+						fillColor = colorPalette.memory.secondary;
 					}
 
 					const { hex: fillHex, alpha: fillAlpha } = toHexAlpha(fillColor);
@@ -360,7 +338,7 @@ export const GraphWebGLCanvas = memo<GraphCanvasProps>(
 						g.stroke();
 					} else if (isNew) {
 						const { hex: dotHex, alpha: dotAlpha } = toHexAlpha(
-							colors.status.new,
+							colorPalette.status.new,
 						);
 						// Dot scales with node (GraphCanvas behaviour)
 						const dotRadius = Math.max(2, nodeSize * 0.15);
@@ -374,7 +352,7 @@ export const GraphWebGLCanvas = memo<GraphCanvasProps>(
 					}
 				});
 			},
-			[nodes, zoom],
+			[nodes, zoom, colorPalette],
 		);
 
 		/* ---------- Edges layer ---------- */
@@ -489,21 +467,21 @@ export const GraphWebGLCanvas = memo<GraphCanvasProps>(
 					let lineWidth = Math.max(1, edge.visualProps?.thickness ?? 1);
 					// Use opacity exactly as provided to match GraphCanvas behaviour
 					let opacity = edge.visualProps.opacity;
-					let col = edge.color || colors.connection.weak;
+					let col = edge.color || colorPalette.connection.weak;
 
 					if (edge.edgeType === "doc-memory") {
 						lineWidth = 1;
 						opacity = 0.9;
-						col = colors.connection.memory;
+						col = colorPalette.connection.memory;
 
 						if (useSimplified && opacity < 0.3) return;
 					} else if (edge.edgeType === "doc-doc") {
 						opacity = Math.max(0, edge.similarity * 0.5);
 						lineWidth = Math.max(1, edge.similarity * 2);
-						col = colors.connection.medium;
-						if (edge.similarity > 0.85) col = colors.connection.strong;
+						col = colorPalette.connection.medium;
+						if (edge.similarity > 0.85) col = colorPalette.connection.strong;
 					} else if (edge.edgeType === "version") {
-						col = edge.color || colors.relations.updates;
+						col = edge.color || colorPalette.relations.updates;
 						opacity = 0.8;
 						lineWidth = 2;
 					}
@@ -584,7 +562,7 @@ export const GraphWebGLCanvas = memo<GraphCanvasProps>(
 					}
 				});
 			},
-			[edges, nodes, zoom, width, drawDashedQuadratic],
+			[edges, nodes, zoom, width, drawDashedQuadratic, colorPalette],
 		);
 
 		/* ---------- pointer handlers (unchanged) ---------- */
@@ -726,6 +704,31 @@ export const GraphWebGLCanvas = memo<GraphCanvasProps>(
 				}
 			};
 		}, []);
+
+		// Redraw layers only when their data changes ----------------------
+		useEffect(() => {
+			if (gridG.current) drawGrid(gridG.current);
+		}, [panX, panY, zoom, width, height, drawGrid]);
+
+		useEffect(() => {
+			if (edgesG.current) drawEdges(edgesG.current);
+		}, [edges, nodes, zoomBucket, drawEdges]);
+
+		useEffect(() => {
+			if (docsG.current) drawDocuments(docsG.current);
+		}, [nodes, zoomBucket, drawDocuments]);
+
+		useEffect(() => {
+			if (memsG.current) drawMemories(memsG.current);
+		}, [nodes, zoomBucket, drawMemories]);
+
+		// Apply pan & zoom via world transform instead of geometry rebuilds
+		useEffect(() => {
+			if (worldContainerRef.current) {
+				worldContainerRef.current.position.set(panX, panY);
+				worldContainerRef.current.scale.set(zoom);
+			}
+		}, [panX, panY, zoom]);
 
 		return (
 			<div

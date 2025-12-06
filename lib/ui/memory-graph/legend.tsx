@@ -10,7 +10,9 @@ import {
 import { GlassMenuEffect } from "@/components/ui/other/glass-effect";
 import { Brain, ChevronDown, ChevronUp, FileText } from "lucide-react";
 import { memo, useEffect, useState } from "react";
+import { useTheme } from "next-themes";
 import { colors } from "./constants";
+import { getThemeColors } from "./theme-colors";
 import type { GraphEdge, GraphNode, LegendProps } from "./types";
 
 // Cookie utility functions for legend state
@@ -50,17 +52,22 @@ export const Legend = memo(function Legend({
 	isLoading = false,
 	isExperimental = false,
 }: ExtendedLegendProps) {
+	const { theme: currentTheme, resolvedTheme } = useTheme();
 	const isMobile = useIsMobile();
 	const [isExpanded, setIsExpanded] = useState(true);
 	const [isInitialized, setIsInitialized] = useState(false);
 
+	// Get theme-aware colors
+	const theme = (currentTheme || resolvedTheme || 'dark') as 'light' | 'dark';
+	const themeColors = getThemeColors(theme);
+
 	const relationData = isExperimental
 		? [
-				["updates", colors.relations.updates],
-				["extends", colors.relations.extends],
-				["derives", colors.relations.derives],
+				["updates", themeColors.relations.updates],
+				["extends", themeColors.relations.extends],
+				["derives", themeColors.relations.derives],
 			]
-		: [["updates", colors.relations.updates]];
+		: [["updates", themeColors.relations.updates]];
 
 	// Load saved preference on client side
 	useEffect(() => {
@@ -125,10 +132,10 @@ export const Legend = memo(function Legend({
 				<div className="relative z-10">
 					{/* Mobile and Desktop collapsed state */}
 					{!isExpanded && (
-						<CollapsibleTrigger className="w-full h-full p-2 flex items-center justify-center hover:bg-white/5 transition-colors">
+						<CollapsibleTrigger className="w-full h-full p-2 flex items-center justify-center hover:bg-white/5 dark:hover:bg-white/5 transition-colors">
 							<div className="flex flex-col items-center gap-1">
-								<div className="text-xs text-slate-300 font-medium">?</div>
-								<ChevronUp className="w-3 h-3 text-slate-400" />
+								<div className="text-xs text-muted-foreground font-medium">?</div>
+								<ChevronUp className="w-3 h-3 text-muted-foreground" />
 							</div>
 						</CollapsibleTrigger>
 					)}
@@ -137,30 +144,30 @@ export const Legend = memo(function Legend({
 					{isExpanded && (
 						<>
 							{/* Header with toggle */}
-							<div className="flex items-center justify-between px-4 py-3 border-b border-slate-600/50">
-								<div className="text-sm font-medium text-slate-100">Legend</div>
-								<CollapsibleTrigger className="p-1 hover:bg-white/10 rounded">
-									<ChevronDown className="w-4 h-4 text-slate-400" />
+							<div className="flex items-center justify-between px-4 py-3 border-b border-muted-foreground/20">
+								<div className="text-sm font-medium text-foreground">Legend</div>
+								<CollapsibleTrigger className="p-1 hover:bg-muted/20 rounded">
+									<ChevronDown className="w-4 h-4 text-muted-foreground" />
 								</CollapsibleTrigger>
 							</div>
 
 							<CollapsibleContent>
-								<div className="text-xs text-slate-200 px-4 py-3 space-y-3">
+								<div className="text-xs text-foreground px-4 py-3 space-y-3">
 									{/* Stats Section */}
 									{!isLoading && (
 										<div className="space-y-2">
-											<div className="text-xs font-medium text-slate-300 uppercase tracking-wide">
+											<div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
 												Statistics
 											</div>
 											<div className="space-y-1.5">
 												<div className="flex items-center gap-2">
-													<Brain className="w-3 h-3 text-blue-400" />
+													<Brain className="w-3 h-3 text-blue-500 dark:text-blue-400" />
 													<span className="text-xs">
 														{memoryCount} memories
 													</span>
 												</div>
 												<div className="flex items-center gap-2">
-													<FileText className="w-3 h-3 text-slate-300" />
+													<FileText className="w-3 h-3 text-muted-foreground" />
 													<span className="text-xs">
 														{documentCount} documents
 													</span>
@@ -177,17 +184,17 @@ export const Legend = memo(function Legend({
 
 									{/* Node Types */}
 									<div className="space-y-2">
-										<div className="text-xs font-medium text-slate-300 uppercase tracking-wide">
+										<div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
 											Nodes
 										</div>
 										<div className="space-y-1.5">
 											<div className="flex items-center gap-2">
-												<div className="w-4 h-3 bg-white/8 border border-white/25 rounded-sm flex-shrink-0" />
+												<div className="w-4 h-3 bg-black/5 dark:bg-white/8 border border-black/20 dark:border-white/25 rounded-sm flex-shrink-0" />
 												<span className="text-xs">Document</span>
 											</div>
 											<div className="flex items-center gap-2">
 												<div
-													className="w-3 h-3 bg-blue-400/10 border border-blue-400/35 flex-shrink-0"
+													className="w-3 h-3 bg-blue-500/10 dark:bg-blue-400/10 border border-blue-500/30 dark:border-blue-400/35 flex-shrink-0"
 													style={{
 														clipPath: hexagonClipPath,
 													}}
@@ -196,7 +203,7 @@ export const Legend = memo(function Legend({
 											</div>
 											<div className="flex items-center gap-2">
 												<div
-													className="w-3 h-3 bg-blue-400/10 border border-blue-400/35 opacity-40 flex-shrink-0"
+													className="w-3 h-3 bg-blue-500/10 dark:bg-blue-400/10 border border-blue-500/30 dark:border-blue-400/35 opacity-40 flex-shrink-0"
 													style={{
 														clipPath: hexagonClipPath,
 													}}
@@ -208,7 +215,7 @@ export const Legend = memo(function Legend({
 
 									{/* Status Indicators */}
 									<div className="space-y-2">
-										<div className="text-xs font-medium text-slate-300 uppercase tracking-wide">
+										<div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
 											Status
 										</div>
 										<div className="space-y-1.5">
@@ -227,7 +234,7 @@ export const Legend = memo(function Legend({
 											</div>
 											<div className="flex items-center gap-2">
 												<div
-													className="w-3 h-3 bg-blue-400/10 border-2 border-amber-500 flex-shrink-0"
+													className="w-3 h-3 bg-blue-500/10 dark:bg-blue-400/10 border-2 border-amber-500 flex-shrink-0"
 													style={{
 														clipPath: hexagonClipPath,
 													}}
@@ -236,7 +243,7 @@ export const Legend = memo(function Legend({
 											</div>
 											<div className="flex items-center gap-2">
 												<div
-													className="w-3 h-3 bg-blue-400/10 border-2 border-emerald-500 relative flex-shrink-0"
+													className="w-3 h-3 bg-blue-500/10 dark:bg-blue-400/10 border-2 border-emerald-500 relative flex-shrink-0"
 													style={{
 														clipPath: hexagonClipPath,
 													}}
@@ -250,16 +257,16 @@ export const Legend = memo(function Legend({
 
 									{/* Connection Types */}
 									<div className="space-y-2">
-										<div className="text-xs font-medium text-slate-300 uppercase tracking-wide">
+										<div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
 											Connections
 										</div>
 										<div className="space-y-1.5">
 											<div className="flex items-center gap-2">
-												<div className="w-4 h-0 border-t border-slate-400 flex-shrink-0" />
+												<div className="w-4 h-0 border-t border-slate-600 dark:border-slate-400 flex-shrink-0" />
 												<span className="text-xs">Doc → Memory</span>
 											</div>
 											<div className="flex items-center gap-2">
-												<div className="w-4 h-0 border-t-2 border-dashed border-slate-400 flex-shrink-0" />
+												<div className="w-4 h-0 border-t-2 border-dashed border-slate-600 dark:border-slate-400 flex-shrink-0" />
 												<span className="text-xs">Doc similarity</span>
 											</div>
 										</div>
@@ -267,17 +274,17 @@ export const Legend = memo(function Legend({
 
 									{/* Relation Types */}
 									<div className="space-y-2">
-										<div className="text-xs font-medium text-slate-300 uppercase tracking-wide">
+										<div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
 											Relations
 										</div>
 										<div className="space-y-1.5">
 											{(isExperimental
 												? [
-														["updates", colors.relations.updates],
-														["extends", colors.relations.extends],
-														["derives", colors.relations.derives],
+														["updates", themeColors.relations.updates],
+														["extends", themeColors.relations.extends],
+														["derives", themeColors.relations.derives],
 													]
-												: [["updates", colors.relations.updates]]
+												: [["updates", themeColors.relations.updates]]
 											).map(([label, color]) => (
 												<div className="flex items-center gap-2" key={label}>
 													<div
@@ -297,16 +304,16 @@ export const Legend = memo(function Legend({
 
 									{/* Similarity Strength */}
 									<div className="space-y-2">
-										<div className="text-xs font-medium text-slate-300 uppercase tracking-wide">
+										<div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
 											Similarity
 										</div>
 										<div className="space-y-1.5">
 											<div className="flex items-center gap-2">
-												<div className="w-3 h-3 rounded-full bg-slate-400/20 flex-shrink-0" />
+												<div className="w-3 h-3 rounded-full bg-slate-600/20 dark:bg-slate-400/20 flex-shrink-0" />
 												<span className="text-xs">Weak</span>
 											</div>
 											<div className="flex items-center gap-2">
-												<div className="w-3 h-3 rounded-full bg-slate-400/60 flex-shrink-0" />
+												<div className="w-3 h-3 rounded-full bg-slate-600/60 dark:bg-slate-400/60 flex-shrink-0" />
 												<span className="text-xs">Strong</span>
 											</div>
 										</div>

@@ -3,6 +3,7 @@ import type {
   DocumentWithMemories,
   MemoryEntry
 } from "@/lib/types/supermemory";
+import type { ThemeColors } from './theme-colors';
 
 export type DocumentsResponse = DocumentsWithMemoriesResponseSchema;
 export type { DocumentWithMemories, MemoryEntry };
@@ -75,6 +76,7 @@ export interface GraphCanvasProps {
 	// Optional list of document IDs (customId or internal id) to highlight
 	highlightDocumentIds?: string[];
 	isExperimental?: boolean;
+	themeColors?: ThemeColors;
 }
 
 export interface MemoryGraphProps {

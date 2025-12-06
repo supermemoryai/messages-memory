@@ -3,7 +3,9 @@
 import { GlassMenuEffect } from '@/components/ui/other/glass-effect';
 import { AnimatePresence } from 'motion/react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTheme } from 'next-themes';
 import { colors } from './constants';
+import { getThemeColors } from './theme-colors';
 import { GraphWebGLCanvas as GraphCanvas } from './graph-webgl-canvas';
 import { useGraphData } from './hooks/use-graph-data';
 import { useGraphInteractions } from './hooks/use-graph-interactions';
@@ -33,9 +35,14 @@ export const MemoryGraph = ({
   autoLoadOnViewport = true,
   isExperimental = false,
 }: MemoryGraphProps) => {
+  const { theme: currentTheme, resolvedTheme } = useTheme();
   const [selectedSpace, setSelectedSpace] = useState<string>('all');
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Get theme-aware colors
+  const theme = (currentTheme || resolvedTheme || 'dark') as 'light' | 'dark';
+  const themeColors = useMemo(() => getThemeColors(theme), [theme]);
 
   // Create data object with dummy pagination to satisfy type requirements
   const data = useMemo(() => {
@@ -346,13 +353,13 @@ export const MemoryGraph = ({
     return (
       <div
         className="h-full flex items-center justify-center"
-        style={{ backgroundColor: colors.background.primary }}
+        style={{ backgroundColor: themeColors.background.primary }}
       >
         <div className="rounded-xl overflow-hidden">
           {/* Glass effect background */}
           <GlassMenuEffect rounded="rounded-xl" />
 
-          <div className="relative z-10 text-slate-200 px-6 py-4">
+          <div className="relative z-10 px-6 py-4" style={{ color: themeColors.text.primary }}>
             Error loading documents: {error.message}
           </div>
         </div>
@@ -363,7 +370,7 @@ export const MemoryGraph = ({
   return (
     <div
       className="h-full rounded-xl overflow-hidden"
-      style={{ backgroundColor: colors.background.primary }}
+      style={{ backgroundColor: themeColors.background.primary }}
     >
       {/* Spaces selector - only shown for console */}
       {showSpacesSelector && availableSpaces.length > 0 && (
@@ -445,6 +452,7 @@ export const MemoryGraph = ({
             panY={panY}
             width={containerSize.width}
             zoom={zoom}
+            themeColors={themeColors}
           />
         )}
 
