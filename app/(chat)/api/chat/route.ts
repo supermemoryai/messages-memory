@@ -1,4 +1,9 @@
-import { streamText, convertToModelMessages, stepCountIs } from 'ai';
+import {
+  streamText,
+  convertToModelMessages,
+  stepCountIs,
+  type ToolSet,
+} from 'ai';
 import { withSupermemory } from '@supermemory/tools/ai-sdk';
 import { auth, type UserType } from '@/app/(auth)/auth';
 import { type RequestHints, systemPrompt } from '@/lib/ai/prompts';
@@ -212,7 +217,7 @@ export async function POST(request: Request) {
     const toolsConfig = {
       searchMemories: memoryTools.searchMemories,
       webSearch: webSearchTool,
-    };
+    } as ToolSet;
 
     // Log what messages we're sending to AI SDK
     const convertedMessages = convertToModelMessages(messages as any);
