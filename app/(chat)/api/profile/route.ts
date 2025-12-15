@@ -29,7 +29,8 @@ export async function GET(request: Request) {
         '[Profile API] Fetching profile from Supermemory with containerTag:',
         containerTag,
       );
-      const response = await fetch('https://api.supermemory.ai/v4/profile', {
+      const baseUrl = process.env.SUPERMEMORY_BASE_URL || 'https://api.supermemory.ai';
+      const response = await fetch(`${baseUrl}/v4/profile`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

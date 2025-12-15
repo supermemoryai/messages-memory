@@ -154,19 +154,18 @@ export async function POST(request: Request) {
           '[Chat API] Checking for existing memories for user:',
           containerTag,
         );
-        const profileResponse = await fetch(
-          'https://api.supermemory.ai/v4/profile',
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${supermemoryApiKey}`,
-            },
-            body: JSON.stringify({
-              containerTag: containerTag,
-            }),
+        const baseUrl =
+          process.env.SUPERMEMORY_BASE_URL || 'https://api.supermemory.ai';
+        const profileResponse = await fetch(`${baseUrl}/v4/profile`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${supermemoryApiKey}`,
           },
-        );
+          body: JSON.stringify({
+            containerTag: containerTag,
+          }),
+        });
 
         if (profileResponse.ok) {
           const profileData = await profileResponse.json();

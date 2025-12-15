@@ -34,8 +34,9 @@ export async function POST(request: Request) {
 
     try {
       // Fetch documents from Supermemory API
+      const baseUrl = process.env.SUPERMEMORY_BASE_URL || 'https://api.supermemory.ai';
       const response = await fetch(
-        'https://api.supermemory.ai/v3/documents/documents',
+        `${baseUrl}/v3/documents/documents`,
         {
           method: 'POST',
           headers: {

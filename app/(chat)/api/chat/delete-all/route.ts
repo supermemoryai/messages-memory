@@ -40,8 +40,9 @@ export async function DELETE(request: Request) {
       };
       console.log('[Delete All] Request body:', JSON.stringify(requestBody));
 
+      const baseUrl = process.env.SUPERMEMORY_BASE_URL || 'https://api.supermemory.ai';
       const deleteMemoriesResponse = await fetch(
-        'https://api.supermemory.ai/v3/documents/bulk',
+        `${baseUrl}/v3/documents/bulk`,
         {
           method: 'DELETE',
           headers: {
