@@ -1,16 +1,16 @@
-"use client";
+'use client';
 
-import { useState, useCallback } from "react";
+import { useState, useCallback } from 'react';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { MemoryGraph } from "@supermemory/memory-graph";
-import { Button } from "@/components/ui/button";
-import { Network } from "lucide-react";
-import type { DocumentWithMemories } from "@/lib/types/supermemory";
+} from '@/components/ui/dialog';
+import { MemoryGraph } from '../../supermemory/packages/memory-graph/src';
+import { Button } from '@/components/ui/button';
+import { Network } from 'lucide-react';
+import type { DocumentWithMemories } from '@/lib/types/supermemory';
 
 interface MemoryGraphDialogProps {
   open?: boolean;
@@ -37,35 +37,32 @@ export function MemoryGraphDialog({
   const onOpenChange = controlledOnOpenChange || setInternalOpen;
 
   // Fetch documents when dialog opens
-  const fetchDocuments = useCallback(
-    async (page: number, limit: number = 500) => {
-      try {
-        const response = await fetch("/api/documents", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            page,
-            limit,
-            sort: "createdAt",
-            order: "desc",
-          }),
-        });
+  const fetchDocuments = useCallback(async (page: number, limit = 500) => {
+    try {
+      const response = await fetch('/api/documents', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          page,
+          limit,
+          sort: 'createdAt',
+          order: 'desc',
+        }),
+      });
 
-        if (!response.ok) {
-          throw new Error("Failed to fetch documents");
-        }
-
-        const data = await response.json();
-        return data;
-      } catch (err) {
-        console.error("Error fetching documents:", err);
-        throw err;
+      if (!response.ok) {
+        throw new Error('Failed to fetch documents');
       }
-    },
-    [],
-  );
+
+      const data = await response.json();
+      return data;
+    } catch (err) {
+      console.error('Error fetching documents:', err);
+      throw err;
+    }
+  }, []);
 
   // Load initial documents
   const loadInitialDocuments = useCallback(async () => {
@@ -102,7 +99,7 @@ export function MemoryGraphDialog({
         setHasMore(false);
       }
     } catch (err) {
-      console.error("Error loading more documents:", err);
+      console.error('Error loading more documents:', err);
       // Don't set error state for pagination failures
     } finally {
       setIsLoadingMore(false);

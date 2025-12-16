@@ -34,24 +34,22 @@ export async function POST(request: Request) {
 
     try {
       // Fetch documents from Supermemory API
-      const baseUrl = process.env.SUPERMEMORY_BASE_URL || 'https://api.supermemory.ai';
-      const response = await fetch(
-        `${baseUrl}/v3/documents/documents`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': process.env.SUPERMEMORY_API_KEY,
-          },
-          body: JSON.stringify({
-            page,
-            limit,
-            sort,
-            order,
-            containerTags: [containerTag], // Filter by user's container tag only
-          }),
+      const baseUrl =
+        process.env.SUPERMEMORY_BASE_URL || 'https://api.supermemory.ai';
+      const response = await fetch(`${baseUrl}/v3/documents/documents`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': process.env.SUPERMEMORY_API_KEY,
         },
-      );
+        body: JSON.stringify({
+          page,
+          limit,
+          sort,
+          order,
+          containerTags: [containerTag], // Filter by user's container tag only
+        }),
+      });
 
       if (!response.ok) {
         console.error(
@@ -94,6 +92,8 @@ export async function POST(request: Request) {
           limit: limit,
         },
       };
+
+      console.log(result);
 
       return NextResponse.json(result, { status: 200 });
     } catch (fetchError) {

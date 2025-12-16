@@ -212,6 +212,7 @@ export async function POST(request: Request) {
       mode: 'full',
       verbose: true,
       addMemory: 'always',
+      baseUrl: process.env.SUPERMEMORY_BASE_URL || 'https://api.supermemory.ai',
     });
 
     const toolsConfig = {
