@@ -15,6 +15,8 @@ import {
   getChatById,
   getMessageCountByUserId,
   getMessagesByChatId,
+  getWorkspacesByUserId,
+  createWorkspace,
   saveChat,
   saveMessages,
 } from '@/lib/db/queries';
@@ -61,14 +63,25 @@ export async function POST(request: Request) {
 
     const chat = await getChatById({ id });
     if (!chat) {
+      const existingWorkspaces = await getWorkspacesByUserId({
+        userId: session.user.id,
+      });
+      const workspaceId =
+        existingWorkspaces[0]?.id ??
+        (await createWorkspace({
+          name: 'Personal',
+          createdBy: session.user.id,
+        })).id;
+
       await saveChat({
         id,
-        userId: session.user.id,
+        workspaceId,
+        createdBy: session.user.id,
         title: '',
         visibility: selectedVisibilityType,
       });
     } else {
-      if (chat.userId !== session.user.id) {
+      if (chat.createdBy !== session.user.id) {
         return new ChatSDKError('forbidden:chat').toResponse();
       }
     }
@@ -115,6 +128,7 @@ export async function POST(request: Request) {
         {
           chatId: id,
           id: message.id,
+          userId: session.user.id,
           role: 'user',
           parts: message.parts,
           attachments:
@@ -323,7 +337,7 @@ export async function DELETE(request: Request) {
   }
 
   const chat = await getChatById({ id });
-  if (chat.userId !== session.user.id) {
+  if (chat.createdBy !== session.user.id) {
     return new ChatSDKError('forbidden:chat').toResponse();
   }
 

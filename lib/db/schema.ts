@@ -19,11 +19,52 @@ export const user = pgTable('User', {
 
 export type User = InferSelectModel<typeof user>;
 
+export const workspace = pgTable('Workspace', {
+  id: uuid('id').primaryKey().notNull().defaultRandom(),
+  name: varchar('name', { length: 100 }).notNull(),
+  createdBy: uuid('createdBy')
+    .notNull()
+    .references(() => user.id),
+  createdAt: timestamp('createdAt').notNull(),
+});
+
+export type Workspace = InferSelectModel<typeof workspace>;
+
+export const workspaceMember = pgTable('WorkspaceMember', {
+  id: uuid('id').primaryKey().notNull().defaultRandom(),
+  workspaceId: uuid('workspaceId')
+    .notNull()
+    .references(() => workspace.id, { onDelete: 'cascade' }),
+  userId: uuid('userId')
+    .notNull()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  joinedAt: timestamp('joinedAt').notNull(),
+});
+
+export type WorkspaceMember = InferSelectModel<typeof workspaceMember>;
+
+export const invitation = pgTable('Invitation', {
+  id: uuid('id').primaryKey().notNull().defaultRandom(),
+  workspaceId: uuid('workspaceId')
+    .notNull()
+    .references(() => workspace.id, { onDelete: 'cascade' }),
+  token: varchar('token', { length: 64 }).notNull().unique(),
+  createdBy: uuid('createdBy')
+    .notNull()
+    .references(() => user.id),
+  createdAt: timestamp('createdAt').notNull(),
+});
+
+export type Invitation = InferSelectModel<typeof invitation>;
+
 export const chat = pgTable('Chat', {
   id: uuid('id').primaryKey().notNull().defaultRandom(),
   createdAt: timestamp('createdAt').notNull(),
   title: text('title').notNull(),
-  userId: uuid('userId')
+  workspaceId: uuid('workspaceId')
+    .notNull()
+    .references(() => workspace.id, { onDelete: 'cascade' }),
+  createdBy: uuid('createdBy')
     .notNull()
     .references(() => user.id),
   visibility: varchar('visibility', { enum: ['public', 'private'] })
@@ -52,6 +93,8 @@ export const message = pgTable('Message_v2', {
   chatId: uuid('chatId')
     .notNull()
     .references(() => chat.id),
+  userId: uuid('userId')
+    .references(() => user.id),
   role: varchar('role').notNull(),
   parts: json('parts').notNull(),
   attachments: json('attachments').notNull(),

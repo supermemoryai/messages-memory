@@ -27,6 +27,9 @@ import {
   type DBMessage,
   type Chat,
   stream,
+  workspace,
+  workspaceMember,
+  invitation,
 } from './schema';
 import type { ArtifactKind } from '@/components/artifact';
 import { generateUUID } from '../utils';
@@ -82,12 +85,14 @@ export async function createGuestUser() {
 
 export async function saveChat({
   id,
-  userId,
+  workspaceId,
+  createdBy,
   title,
   visibility,
 }: {
   id: string;
-  userId: string;
+  workspaceId: string;
+  createdBy: string;
   title: string;
   visibility: VisibilityType;
 }) {
@@ -95,7 +100,8 @@ export async function saveChat({
     return await db.insert(chat).values({
       id,
       createdAt: new Date(),
-      userId,
+      workspaceId,
+      createdBy,
       title,
       visibility,
     });
@@ -143,8 +149,8 @@ export async function getChatsByUserId({
         .from(chat)
         .where(
           whereCondition
-            ? and(whereCondition, eq(chat.userId, id))
-            : eq(chat.userId, id),
+            ? and(whereCondition, eq(chat.createdBy, id))
+            : eq(chat.createdBy, id),
         )
         .orderBy(desc(chat.createdAt))
         .limit(extendedLimit);
@@ -195,6 +201,82 @@ export async function getChatsByUserId({
     throw new ChatSDKError(
       'bad_request:database',
       'Failed to get chats by user id',
+    );
+  }
+}
+
+export async function getChatsByWorkspaceId({
+  workspaceId,
+  limit,
+  startingAfter,
+  endingBefore,
+}: {
+  workspaceId: string;
+  limit: number;
+  startingAfter: string | null;
+  endingBefore: string | null;
+}) {
+  try {
+    const extendedLimit = limit + 1;
+
+    const query = (whereCondition?: SQL<any>) =>
+      db
+        .select()
+        .from(chat)
+        .where(
+          whereCondition
+            ? and(whereCondition, eq(chat.workspaceId, workspaceId))
+            : eq(chat.workspaceId, workspaceId),
+        )
+        .orderBy(desc(chat.createdAt))
+        .limit(extendedLimit);
+
+    let filteredChats: Array<Chat> = [];
+
+    if (startingAfter) {
+      const [selectedChat] = await db
+        .select()
+        .from(chat)
+        .where(eq(chat.id, startingAfter))
+        .limit(1);
+
+      if (!selectedChat) {
+        throw new ChatSDKError(
+          'not_found:database',
+          `Chat with id ${startingAfter} not found`,
+        );
+      }
+
+      filteredChats = await query(gt(chat.createdAt, selectedChat.createdAt));
+    } else if (endingBefore) {
+      const [selectedChat] = await db
+        .select()
+        .from(chat)
+        .where(eq(chat.id, endingBefore))
+        .limit(1);
+
+      if (!selectedChat) {
+        throw new ChatSDKError(
+          'not_found:database',
+          `Chat with id ${endingBefore} not found`,
+        );
+      }
+
+      filteredChats = await query(lt(chat.createdAt, selectedChat.createdAt));
+    } else {
+      filteredChats = await query();
+    }
+
+    const hasMore = filteredChats.length > limit;
+
+    return {
+      chats: hasMore ? filteredChats.slice(0, limit) : filteredChats,
+      hasMore,
+    };
+  } catch (error) {
+    throw new ChatSDKError(
+      'bad_request:database',
+      'Failed to get chats by workspace id',
     );
   }
 }
@@ -498,10 +580,9 @@ export async function getMessageCountByUserId({
     const [stats] = await db
       .select({ count: count(message.id) })
       .from(message)
-      .innerJoin(chat, eq(message.chatId, chat.id))
       .where(
         and(
-          eq(chat.userId, id),
+          eq(message.userId, id),
           gte(message.createdAt, twentyFourHoursAgo),
           eq(message.role, 'user'),
         ),
@@ -618,5 +699,249 @@ export async function deleteMessagesByChatId({ id }: { id: string }) {
   } catch (error) {
     console.error('Failed to delete messages by chat id from database');
     throw error;
+  }
+}
+
+// Workspace queries
+export async function createWorkspace({
+  name,
+  createdBy,
+}: {
+  name: string;
+  createdBy: string;
+}) {
+  try {
+    const [ws] = await db
+      .insert(workspace)
+      .values({
+        name,
+        createdBy,
+        createdAt: new Date(),
+      })
+      .returning();
+
+    // Auto-add creator as member
+    await db.insert(workspaceMember).values({
+      workspaceId: ws.id,
+      userId: createdBy,
+      joinedAt: new Date(),
+    });
+
+    return ws;
+  } catch (error) {
+    throw new ChatSDKError('bad_request:database', 'Failed to create workspace');
+  }
+}
+
+export async function getWorkspacesByUserId({ userId }: { userId: string }) {
+  try {
+    const workspaces = await db
+      .select({
+        id: workspace.id,
+        name: workspace.name,
+        createdBy: workspace.createdBy,
+        createdAt: workspace.createdAt,
+      })
+      .from(workspace)
+      .innerJoin(workspaceMember, eq(workspace.id, workspaceMember.workspaceId))
+      .where(eq(workspaceMember.userId, userId))
+      .orderBy(desc(workspace.createdAt));
+
+    return workspaces;
+  } catch (error) {
+    throw new ChatSDKError(
+      'bad_request:database',
+      'Failed to get workspaces by user id',
+    );
+  }
+}
+
+export async function getWorkspaceById({ id }: { id: string }) {
+  try {
+    const [ws] = await db.select().from(workspace).where(eq(workspace.id, id));
+    return ws;
+  } catch (error) {
+    throw new ChatSDKError(
+      'bad_request:database',
+      'Failed to get workspace by id',
+    );
+  }
+}
+
+export async function deleteWorkspace({ id }: { id: string }) {
+  try {
+    // Cascade delete will handle members, invitations, chats, messages
+    const [deleted] = await db
+      .delete(workspace)
+      .where(eq(workspace.id, id))
+      .returning();
+    return deleted;
+  } catch (error) {
+    throw new ChatSDKError('bad_request:database', 'Failed to delete workspace');
+  }
+}
+
+// WorkspaceMember queries
+export async function getWorkspaceMember({
+  workspaceId,
+  userId,
+}: {
+  workspaceId: string;
+  userId: string;
+}) {
+  try {
+    const [member] = await db
+      .select()
+      .from(workspaceMember)
+      .where(
+        and(
+          eq(workspaceMember.workspaceId, workspaceId),
+          eq(workspaceMember.userId, userId),
+        ),
+      );
+    return member;
+  } catch (error) {
+    throw new ChatSDKError(
+      'bad_request:database',
+      'Failed to get workspace member',
+    );
+  }
+}
+
+export async function getWorkspaceMembers({
+  workspaceId,
+}: {
+  workspaceId: string;
+}) {
+  try {
+    const members = await db
+      .select({
+        id: workspaceMember.id,
+        userId: workspaceMember.userId,
+        joinedAt: workspaceMember.joinedAt,
+        email: user.email,
+      })
+      .from(workspaceMember)
+      .innerJoin(user, eq(workspaceMember.userId, user.id))
+      .where(eq(workspaceMember.workspaceId, workspaceId))
+      .orderBy(asc(workspaceMember.joinedAt));
+
+    return members;
+  } catch (error) {
+    throw new ChatSDKError(
+      'bad_request:database',
+      'Failed to get workspace members',
+    );
+  }
+}
+
+export async function addWorkspaceMember({
+  workspaceId,
+  userId,
+}: {
+  workspaceId: string;
+  userId: string;
+}) {
+  try {
+    const [member] = await db
+      .insert(workspaceMember)
+      .values({
+        workspaceId,
+        userId,
+        joinedAt: new Date(),
+      })
+      .returning();
+    return member;
+  } catch (error) {
+    throw new ChatSDKError(
+      'bad_request:database',
+      'Failed to add workspace member',
+    );
+  }
+}
+
+export async function removeWorkspaceMember({
+  workspaceId,
+  userId,
+}: {
+  workspaceId: string;
+  userId: string;
+}) {
+  try {
+    const [removed] = await db
+      .delete(workspaceMember)
+      .where(
+        and(
+          eq(workspaceMember.workspaceId, workspaceId),
+          eq(workspaceMember.userId, userId),
+        ),
+      )
+      .returning();
+    return removed;
+  } catch (error) {
+    throw new ChatSDKError(
+      'bad_request:database',
+      'Failed to remove workspace member',
+    );
+  }
+}
+
+// Invitation queries
+export async function createInvitation({
+  workspaceId,
+  createdBy,
+}: {
+  workspaceId: string;
+  createdBy: string;
+}) {
+  try {
+    const token = generateUUID(); // Use UUID as token
+    const [inv] = await db
+      .insert(invitation)
+      .values({
+        workspaceId,
+        token,
+        createdBy,
+        createdAt: new Date(),
+      })
+      .returning();
+    return inv;
+  } catch (error) {
+    throw new ChatSDKError('bad_request:database', 'Failed to create invitation');
+  }
+}
+
+export async function getInvitationByToken({ token }: { token: string }) {
+  try {
+    const [inv] = await db
+      .select({
+        id: invitation.id,
+        workspaceId: invitation.workspaceId,
+        token: invitation.token,
+        createdBy: invitation.createdBy,
+        createdAt: invitation.createdAt,
+        workspaceName: workspace.name,
+      })
+      .from(invitation)
+      .innerJoin(workspace, eq(invitation.workspaceId, workspace.id))
+      .where(eq(invitation.token, token));
+    return inv;
+  } catch (error) {
+    throw new ChatSDKError(
+      'bad_request:database',
+      'Failed to get invitation by token',
+    );
+  }
+}
+
+export async function deleteInvitation({ id }: { id: string }) {
+  try {
+    const [deleted] = await db
+      .delete(invitation)
+      .where(eq(invitation.id, id))
+      .returning();
+    return deleted;
+  } catch (error) {
+    throw new ChatSDKError('bad_request:database', 'Failed to delete invitation');
   }
 }
