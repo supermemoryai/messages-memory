@@ -93,8 +93,7 @@ export const message = pgTable('Message_v2', {
   chatId: uuid('chatId')
     .notNull()
     .references(() => chat.id),
-  userId: uuid('userId')
-    .references(() => user.id),
+  userId: uuid('userId').references(() => user.id),
   role: varchar('role').notNull(),
   parts: json('parts').notNull(),
   attachments: json('attachments').notNull(),

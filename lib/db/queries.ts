@@ -727,6 +727,44 @@ export async function createWorkspace({
       joinedAt: new Date(),
     });
 
+    // Create #setup channel with onboarding message
+    const setupChannelId = crypto.randomUUID();
+    await db.insert(chat).values({
+      id: setupChannelId,
+      workspaceId: ws.id,
+      createdBy,
+      title: 'setup',
+      visibility: 'private',
+      createdAt: new Date(),
+    });
+
+    // Seed the onboarding message
+    const onboardingText = `Welcome to your new workspace! 👋
+
+I'm your AI assistant, and I'm here to help you with anything you need. This is your #setup channel - a great place to get started.
+
+Here's what makes me different:
+- I have persistent memory within each channel - I'll remember our conversations and context
+- I can search the web for current information when needed
+- I work naturally and seamlessly, using tools in the background without announcing it
+
+A few tips:
+- Each channel has its own isolated memory and context
+- I can help with research, brainstorming, coding, writing, and much more
+- Just ask me questions naturally - I'll figure out what tools I need to use
+
+What would you like to work on today?`;
+
+    await db.insert(message).values({
+      id: crypto.randomUUID(),
+      chatId: setupChannelId,
+      userId: null, // Assistant message
+      role: 'assistant',
+      parts: [{ type: 'text', text: onboardingText }],
+      attachments: [],
+      createdAt: new Date(),
+    });
+
     return ws;
   } catch (error) {
     throw new ChatSDKError('bad_request:database', 'Failed to create workspace');
