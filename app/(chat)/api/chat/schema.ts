@@ -14,6 +14,7 @@ const filePartSchema = z.object({
 
 export const postRequestBodySchema = z.object({
   id: z.string().uuid(),
+  workspaceId: z.string().uuid(),
   message: z.object({
     id: z.string().uuid(),
     createdAt: z.coerce.date(),
