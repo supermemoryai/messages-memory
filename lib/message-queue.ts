@@ -4,6 +4,7 @@ import type { Conversation, Message, Reaction, ReactionType } from "../types";
 type MessageTask = {
   id: string;
   conversation: Conversation;
+  workspaceId: string;
   priority: number;
   timestamp: number;
   abortController: AbortController;
@@ -36,13 +37,14 @@ export class MessageQueue {
   }
 
   // Adds a user message to the queue with highest priority
-  public enqueueUserMessage(conversation: Conversation) {
+  public enqueueUserMessage(conversation: Conversation, workspaceId: string) {
     // Cancel all pending AI messages
     this.cancelAllTasks();
 
     const task: MessageTask = {
       id: crypto.randomUUID(),
       conversation,
+      workspaceId,
       priority: 100,
       timestamp: Date.now(),
       abortController: new AbortController(),
@@ -52,10 +54,11 @@ export class MessageQueue {
   }
 
   // Adds an AI message to the queue with normal priority
-  public enqueueAIMessage(conversation: Conversation) {
+  public enqueueAIMessage(conversation: Conversation, workspaceId: string) {
     const task: MessageTask = {
       id: crypto.randomUUID(),
       conversation,
+      workspaceId,
       priority: 50,
       timestamp: Date.now(),
       abortController: new AbortController(),
@@ -130,6 +133,7 @@ export class MessageQueue {
 
       const requestBody = {
         id: chatId,
+        workspaceId: task.workspaceId,
         message: {
           id: messageId,
           createdAt: new Date(),

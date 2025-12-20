@@ -15,7 +15,8 @@ export type Surface =
   | 'history'
   | 'vote'
   | 'document'
-  | 'suggestions';
+  | 'suggestions'
+  | 'workspace';
 
 export type ErrorCode = `${ErrorType}:${Surface}`;
 
@@ -31,6 +32,7 @@ export const visibilityBySurface: Record<Surface, ErrorVisibility> = {
   vote: 'response',
   document: 'response',
   suggestions: 'response',
+  workspace: 'response',
 };
 
 export class ChatSDKError extends Error {
@@ -90,6 +92,8 @@ export function getMessageByErrorCode(errorCode: ErrorCode): string {
 
     case 'unauthorized:auth':
       return 'You need to sign in before continuing.';
+    case 'unauthorized:workspace':
+      return 'You need to sign in before you can create workspaces.';
     case 'forbidden:auth':
       return 'Your account does not have access to this feature.';
 
