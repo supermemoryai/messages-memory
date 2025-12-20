@@ -15,8 +15,7 @@ import {
   getChatById,
   getMessageCountByUserId,
   getMessagesByChatId,
-  getWorkspacesByUserId,
-  createWorkspace,
+  getWorkspaceMember,
   saveChat,
   saveMessages,
 } from '@/lib/db/queries';
@@ -43,12 +42,22 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { id, message, selectedChatModel, selectedVisibilityType } =
+    const { id, workspaceId, message, selectedChatModel, selectedVisibilityType } =
       requestBody;
 
     const session = await auth();
     if (!session?.user) {
       return new ChatSDKError('unauthorized:chat').toResponse();
+    }
+
+    // Verify workspace membership
+    const member = await getWorkspaceMember({
+      workspaceId,
+      userId: session.user.id,
+    });
+
+    if (!member) {
+      return new ChatSDKError('forbidden:chat', 'Not a member of this workspace').toResponse();
     }
 
     const userType: UserType = session.user.type;
@@ -63,16 +72,6 @@ export async function POST(request: Request) {
 
     const chat = await getChatById({ id });
     if (!chat) {
-      const existingWorkspaces = await getWorkspacesByUserId({
-        userId: session.user.id,
-      });
-      const workspaceId =
-        existingWorkspaces[0]?.id ??
-        (await createWorkspace({
-          name: 'Personal',
-          createdBy: session.user.id,
-        })).id;
-
       await saveChat({
         id,
         workspaceId,
@@ -81,8 +80,8 @@ export async function POST(request: Request) {
         visibility: selectedVisibilityType,
       });
     } else {
-      if (chat.createdBy !== session.user.id) {
-        return new ChatSDKError('forbidden:chat').toResponse();
+      if (chat.workspaceId !== workspaceId) {
+        return new ChatSDKError('forbidden:chat', 'Chat does not belong to this workspace').toResponse();
       }
     }
 
@@ -159,59 +158,9 @@ export async function POST(request: Request) {
       ).toResponse();
     }
 
-    // Always use user ID as container tag
-    const containerTag = session.user.id;
-    console.log('[Chat API] Using container tag:', containerTag);
-
-    // Check if user has existing memories to determine if they're new
-    let isNewUser = true;
-
-    // Only check for existing memories if this is the first message in a new conversation
-    if (previousMessages.length === 0) {
-      try {
-        console.log(
-          '[Chat API] Checking for existing memories for user:',
-          containerTag,
-        );
-        const baseUrl =
-          process.env.SUPERMEMORY_BASE_URL || 'https://api.supermemory.ai';
-        const profileResponse = await fetch(`${baseUrl}/v4/profile`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${supermemoryApiKey}`,
-          },
-          body: JSON.stringify({
-            containerTag: containerTag,
-          }),
-        });
-
-        if (profileResponse.ok) {
-          const profileData = await profileResponse.json();
-          // If profile exists and has content, user is not new
-          if (profileData?.profile.length > 0) {
-            isNewUser = false;
-            console.log(
-              '[Chat API] User has existing memories, not a new user',
-            );
-          } else {
-            console.log(
-              '[Chat API] No existing memories found, treating as new user',
-            );
-          }
-        }
-      } catch (error) {
-        console.error(
-          '[Chat API] Error checking for existing memories:',
-          error,
-        );
-        // Default to treating as existing user if check fails to avoid unnecessary onboarding
-        isNewUser = false;
-      }
-    } else {
-      // If there are previous messages in this conversation, definitely not a new user
-      isNewUser = false;
-    }
+    // Channel-scoped memory: containerTag = channel ID for isolation
+    const containerTag = id;
+    console.log('[Chat API] Using channel-scoped container:', containerTag);
 
     // Create tools
     const memoryTools = createMemoryTools(supermemoryApiKey, containerTag);
@@ -248,7 +197,7 @@ export async function POST(request: Request) {
 
     const result = streamText({
       model: modelWithMemory,
-      system: systemPrompt({ selectedChatModel, requestHints, isNewUser }),
+      system: systemPrompt({ selectedChatModel, requestHints }),
       messages: convertedMessages,
       tools: toolsConfig,
       stopWhen: stepCountIs(3), // Allows up to 3 steps for tool calls and responses
@@ -273,6 +222,7 @@ export async function POST(request: Request) {
                 (messageText, index) => ({
                   id: generateUUID(),
                   chatId: id,
+                  userId: null,
                   role: 'assistant' as const,
                   parts: [{ type: 'text' as const, text: messageText }],
                   attachments: [],
@@ -289,6 +239,7 @@ export async function POST(request: Request) {
                   {
                     id: generateUUID(),
                     chatId: id,
+                    userId: null,
                     role: 'assistant',
                     parts: [{ type: 'text', text: cleanedText }],
                     attachments: [],
@@ -337,8 +288,18 @@ export async function DELETE(request: Request) {
   }
 
   const chat = await getChatById({ id });
-  if (chat.createdBy !== session.user.id) {
-    return new ChatSDKError('forbidden:chat').toResponse();
+  if (!chat) {
+    return new ChatSDKError('bad_request:api', 'Chat not found').toResponse();
+  }
+
+  // Verify workspace membership
+  const member = await getWorkspaceMember({
+    workspaceId: chat.workspaceId,
+    userId: session.user.id,
+  });
+
+  if (!member) {
+    return new ChatSDKError('forbidden:chat', 'Not a member of this workspace').toResponse();
   }
 
   const deletedChat = await deleteChatById({ id });
