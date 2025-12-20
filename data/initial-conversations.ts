@@ -25,80 +25,15 @@ const generateUserSpecificId = (userId: string, suffix: string): string => {
 export const createInitialConversationsForUser = (
   userId: string,
 ): Conversation[] => {
-  // Generate user-specific IDs - deterministic but unique per user
-  const supermemoryId = generateUserSpecificId(userId, 'supermemory-chat');
   const profileId = generateUserSpecificId(userId, 'profile-chat');
-  const supermemoryAssistantId = generateUserSpecificId(
-    userId,
-    'supermemory-assistant',
-  );
   const profileAssistantId = generateUserSpecificId(
     userId,
     'profile-assistant',
   );
-  const welcomeMessageId = generateUserSpecificId(userId, 'welcome-message');
   const profileQuestionId = generateUserSpecificId(userId, 'profile-question');
   const profileResponseId = generateUserSpecificId(userId, 'profile-response');
 
   return [
-    {
-      id: supermemoryId,
-      recipients: [
-        {
-          id: supermemoryAssistantId,
-          name: 'Supermemory',
-          bio: 'Your AI-powered memory assistant',
-          title: 'AI Assistant',
-        },
-      ],
-      lastMessageTime: getTimeAgo(1),
-      unreadCount: 0,
-      pinned: true,
-      messages: [
-        {
-          id: welcomeMessageId,
-          content:
-            "hey dude, what's up? I'm a chatbot made by [supermemory.ai](https://supermemory.ai) to show how easy it is to make chatbots like myself, using supermemory.",
-          sender: 'Supermemory',
-          timestamp: getTimeAgo(5),
-          form: {
-            id: 'user-info-form',
-            title: 'Tell me about yourself',
-            description:
-              'To get started, please provide the following information:',
-            fields: [
-              {
-                id: 'full-name',
-                label: 'Full Name',
-                type: 'text',
-                placeholder: 'Your name',
-                required: true,
-              },
-              {
-                id: 'email-address',
-                label: 'Email Address',
-                placeholder: 'Your email (work or .edu preferred)',
-                type: 'email',
-                required: true,
-              },
-              {
-                id: 'about-yourself',
-                label: 'About Yourself',
-                type: 'textarea',
-                required: false,
-              },
-            ],
-          },
-        },
-        // {
-        //   id: welcomeMessageId,
-        //   content:
-        //     'to get started, can you please give me your: \n- Full name\n- Email address?\nAlso, tell me a little bit about yourself!',
-        //   sender: 'Supermemory',
-        //   timestamp: getTimeAgo(5),
-        // },
-      ],
-    },
     {
       id: profileId,
       recipients: [
@@ -115,13 +50,13 @@ export const createInitialConversationsForUser = (
       messages: [
         {
           id: profileQuestionId,
-          content: 'who am i',
+          content: 'memory graph',
           sender: 'me',
           timestamp: getTimeAgo(1),
         },
         {
           id: profileResponseId,
-          content: 'Loading your profile...',
+          content: 'Select a channel to view its memory graph.',
           sender: 'Profile',
           timestamp: getTimeAgo(0),
         },
@@ -131,9 +66,6 @@ export const createInitialConversationsForUser = (
 };
 
 // Helper functions to get user-specific IDs
-export const getUserSpecificSupermemoryId = (userId: string): string =>
-  generateUserSpecificId(userId, 'supermemory-chat');
-
 export const getUserSpecificProfileId = (userId: string): string =>
   generateUserSpecificId(userId, 'profile-chat');
 
