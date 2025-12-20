@@ -23,12 +23,15 @@ export async function middleware(request: NextRequest) {
     secureCookie: !isDevelopmentEnvironment,
   });
 
-  if (!token) {
-    const redirectUrl = encodeURIComponent(request.url);
+  // Allow unauthenticated access to login and register pages
+  if (!token && ['/login', '/register'].includes(pathname)) {
+    return NextResponse.next();
+  }
 
-    return NextResponse.redirect(
-      new URL(`/api/auth/guest?redirectUrl=${redirectUrl}`, request.url),
-    );
+  if (!token) {
+    // Redirect to login page instead of auto-creating guest users
+    // Users can choose to login or register from there
+    return NextResponse.redirect(new URL('/login', request.url));
   }
 
   const isGuest = guestRegex.test(token?.email ?? '');
