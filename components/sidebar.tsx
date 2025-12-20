@@ -83,12 +83,20 @@ export function Sidebar({
   };
 
   const sortedConversations = [...conversations].sort((a, b) => {
+    // Always pin Profile conversation at the top (Discord-style)
+    const aIsProfile = a.recipients.some(r => r.name === 'Profile');
+    const bIsProfile = b.recipients.some(r => r.name === 'Profile');
+
+    if (aIsProfile && !bIsProfile) return -1;
+    if (!aIsProfile && bIsProfile) return 1;
+
+    // Then sort by pinned status
     if (a.pinned && !b.pinned) return -1;
     if (!a.pinned && b.pinned) return 1;
 
-    const timeA = a.lastMessageTime ? new Date(a.lastMessageTime).getTime() : 0;
-    const timeB = b.lastMessageTime ? new Date(b.lastMessageTime).getTime() : 0;
-    return timeB - timeA;
+    // Discord-style: maintain creation order (don't sort by lastMessageTime)
+    // Conversations are already ordered by creation time from the database/state
+    return 0;
   });
 
   const filteredConversations = sortedConversations.filter((conversation) => {

@@ -228,7 +228,7 @@ export async function getChatsByWorkspaceId({
             ? and(whereCondition, eq(chat.workspaceId, workspaceId))
             : eq(chat.workspaceId, workspaceId),
         )
-        .orderBy(desc(chat.createdAt))
+        .orderBy(asc(chat.createdAt)) // Discord-style: oldest channels first, fixed order
         .limit(extendedLimit);
 
     let filteredChats: Array<Chat> = [];
