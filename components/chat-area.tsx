@@ -227,9 +227,17 @@ export function ChatArea({
     }
   }, [isReadOnly, conversationId]);
 
+  const prevConversationIdRef = useRef(conversationId);
+
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [activeConversation?.messages]);
+    const conversationChanged = prevConversationIdRef.current !== conversationId;
+    prevConversationIdRef.current = conversationId;
+
+    // Scroll instantly when switching conversations, smooth scroll for new messages
+    messagesEndRef.current?.scrollIntoView({
+      behavior: conversationChanged ? 'instant' : 'smooth'
+    });
+  }, [activeConversation?.messages, conversationId]);
 
   useEffect(() => {
     setActiveReactionTarget(null);

@@ -268,9 +268,41 @@ export async function getChatsByWorkspaceId({
     }
 
     const hasMore = filteredChats.length > limit;
+    const chatsToReturn = hasMore ? filteredChats.slice(0, limit) : filteredChats;
+
+    // Fetch last message for each chat to show previews
+    const chatIds = chatsToReturn.map(c => c.id);
+
+    if (chatIds.length > 0) {
+      // Get the latest message for each chat in a single query
+      const lastMessages = await db
+        .select()
+        .from(message)
+        .where(inArray(message.chatId, chatIds))
+        .orderBy(desc(message.createdAt));
+
+      // Group messages by chatId and get the most recent one for each
+      const lastMessageByChat = new Map();
+      for (const msg of lastMessages) {
+        if (!lastMessageByChat.has(msg.chatId)) {
+          lastMessageByChat.set(msg.chatId, msg);
+        }
+      }
+
+      // Attach last message to each chat
+      const chatsWithMessages = chatsToReturn.map(chat => ({
+        ...chat,
+        lastMessage: lastMessageByChat.get(chat.id) || null,
+      }));
+
+      return {
+        chats: chatsWithMessages,
+        hasMore,
+      };
+    }
 
     return {
-      chats: hasMore ? filteredChats.slice(0, limit) : filteredChats,
+      chats: chatsToReturn,
       hasMore,
     };
   } catch (error) {

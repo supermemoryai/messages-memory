@@ -47,6 +47,7 @@ export default function App() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(soundEffects.isEnabled());
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
+  const [loadedConversations, setLoadedConversations] = useState<Set<string>>(new Set());
   const [hasLoadedWorkspaceChats, setHasLoadedWorkspaceChats] = useState(false);
 
   // Add command menu ref
@@ -645,6 +646,27 @@ export default function App() {
 
           for (const chat of chats) {
             const existing = byId.get(chat.id);
+
+            // Convert last message from DB format if it exists
+            const lastMessagePreview = chat.lastMessage
+              ? {
+                  id: chat.lastMessage.id,
+                  sender: chat.lastMessage.role === 'user' ? 'user' : 'ai',
+                  content:
+                    typeof chat.lastMessage.parts === 'string'
+                      ? chat.lastMessage.parts
+                      : Array.isArray(chat.lastMessage.parts)
+                        ? chat.lastMessage.parts
+                            .filter((p: any) => p.type === 'text')
+                            .map((p: any) => p.text)
+                            .join('')
+                        : '',
+                  timestamp: new Date(chat.lastMessage.createdAt).toISOString(),
+                  reactions: [],
+                  attachments: [],
+                }
+              : null;
+
             byId.set(chat.id, {
               id: chat.id,
               name: chat.title || 'Untitled Chat',
@@ -656,8 +678,12 @@ export default function App() {
                   title: 'AI',
                 },
               ],
-              messages: existing?.messages ?? [],
-              lastMessageTime: new Date(chat.createdAt).toISOString(),
+              messages: lastMessagePreview
+                ? [lastMessagePreview, ...(existing?.messages ?? [])]
+                : existing?.messages ?? [],
+              lastMessageTime: chat.lastMessage
+                ? new Date(chat.lastMessage.createdAt).toISOString()
+                : new Date(chat.createdAt).toISOString(),
               unreadCount: 0,
               pinned: chat.title === 'setup' ? true : existing?.pinned,
             });
@@ -691,26 +717,32 @@ export default function App() {
     if (!activeConversation) return;
     if (!hasLoadedWorkspaceChats) return;
 
-    const conv = conversations.find((c) => c.id === activeConversation);
-    if (!conv) return;
+    // Skip if we've already loaded messages for this conversation
+    if (loadedConversations.has(activeConversation)) return;
 
-    const isProfile = conv.recipients.some((r) => r.name === 'Profile');
-    if (isProfile) return;
-    if (conv.messages.length > 0) return;
+    // Check if this is the Profile conversation
+    const conv = conversations.find((c) => c.id === activeConversation);
+    if (conv) {
+      const isProfile = conv.recipients.some((r) => r.name === 'Profile');
+      if (isProfile) return;
+    }
 
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(`/api/messages?chatId=${conv.id}`);
+        const res = await fetch(`/api/messages?chatId=${activeConversation}`);
         if (!res.ok) return;
         const data = await res.json();
         if (cancelled) return;
 
         setConversations((prev) =>
           prev.map((c) =>
-            c.id === conv.id ? { ...c, messages: data.messages ?? [] } : c,
+            c.id === activeConversation ? { ...c, messages: data.messages ?? [] } : c,
           ),
         );
+
+        // Mark this conversation as loaded
+        setLoadedConversations((prev) => new Set(prev).add(activeConversation));
       } catch (e) {
         console.error('[App] Failed to hydrate messages:', e);
       }
@@ -719,7 +751,8 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [activeConversation, conversations, hasLoadedWorkspaceChats]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeConversation, hasLoadedWorkspaceChats]);
 
   // Prefer selecting the seeded `setup` channel once workspace chats are loaded
   useEffect(() => {
