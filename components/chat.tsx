@@ -52,6 +52,27 @@ export function Chat({
   });
 
   const [input, setInput] = useState('');
+  const [workspaceId, setWorkspaceId] = useState<string | null>(null);
+
+  // Fetch workspaces and select first one
+  useEffect(() => {
+    let cancelled = false;
+    async function loadWorkspaces() {
+      try {
+        const res = await fetch('/api/workspaces');
+        if (!res.ok) return;
+        const data = await res.json();
+        const first = data?.workspaces?.[0]?.id ?? null;
+        if (!cancelled) setWorkspaceId(first);
+      } catch (error) {
+        console.error('[Chat] Failed to load workspaces:', error);
+      }
+    }
+    loadWorkspaces();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const {
     messages,
@@ -73,6 +94,7 @@ export function Chat({
         return {
           body: {
             id,
+            workspaceId,
             message: messages.at(-1),
             selectedChatModel: initialChatModel,
             selectedVisibilityType: visibilityType,
@@ -82,7 +104,7 @@ export function Chat({
     }),
 
     onFinish: () => {
-      mutate(unstable_serialize(getChatHistoryPaginationKey));
+      mutate(unstable_serialize(getChatHistoryPaginationKey(workspaceId)));
 
       // Disabled message eviction for now
       // const totalTokens = usage?.totalTokens || 0;
@@ -105,6 +127,7 @@ export function Chat({
 
   const handleSubmit = (e?: React.FormEvent) => {
     e?.preventDefault();
+    if (!workspaceId) return; // Wait for workspace to load
     if (!input.trim()) return;
 
     sendMessage({ text: input });
@@ -152,7 +175,7 @@ export function Chat({
         <ChatHeader
           chatId={id}
           selectedModelId={initialChatModel}
-          selectedVisibilityType={initialVisibilityType}
+          // selectedVisibilityType={initialVisibilityType}
           isReadonly={isReadonly}
           session={session}
           setMessages={setMessages}

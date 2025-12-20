@@ -3,7 +3,7 @@
 import { isToday, isYesterday, subMonths, subWeeks } from 'date-fns';
 import { useParams, useRouter } from 'next/navigation';
 import type { User } from 'next-auth';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
 import {
@@ -76,25 +76,51 @@ const groupChatsByDate = (chats: Chat[]): GroupedChats => {
 };
 
 export function getChatHistoryPaginationKey(
-  pageIndex: number,
-  previousPageData: ChatHistory,
+  workspaceId: string | null,
 ) {
-  if (previousPageData && previousPageData.hasMore === false) {
-    return null;
-  }
+  return (pageIndex: number, previousPageData: ChatHistory) => {
+    if (!workspaceId) return null;
 
-  if (pageIndex === 0) return `/api/history?limit=${PAGE_SIZE}`;
+    if (previousPageData && previousPageData.hasMore === false) {
+      return null;
+    }
 
-  const firstChatFromPage = previousPageData.chats.at(-1);
+    if (pageIndex === 0) {
+      return `/api/history?workspaceId=${workspaceId}&limit=${PAGE_SIZE}`;
+    }
 
-  if (!firstChatFromPage) return null;
+    const firstChatFromPage = previousPageData.chats.at(-1);
 
-  return `/api/history?ending_before=${firstChatFromPage.id}&limit=${PAGE_SIZE}`;
+    if (!firstChatFromPage) return null;
+
+    return `/api/history?workspaceId=${workspaceId}&ending_before=${firstChatFromPage.id}&limit=${PAGE_SIZE}`;
+  };
 }
 
 export function SidebarHistory({ user }: { user: User | undefined }) {
   const setOpenMobile = (open: boolean) => {};
   const { id } = useParams();
+  const [workspaceId, setWorkspaceId] = useState<string | null>(null);
+
+  // Fetch workspaces and select first one
+  useEffect(() => {
+    let cancelled = false;
+    async function loadWorkspaces() {
+      try {
+        const res = await fetch('/api/workspaces');
+        if (!res.ok) return;
+        const data = await res.json();
+        const first = data?.workspaces?.[0]?.id ?? null;
+        if (!cancelled) setWorkspaceId(first);
+      } catch (error) {
+        console.error('[SidebarHistory] Failed to load workspaces:', error);
+      }
+    }
+    loadWorkspaces();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const {
     data: paginatedChatHistories,
@@ -102,7 +128,7 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
     isValidating,
     isLoading,
     mutate,
-  } = useSWRInfinite<ChatHistory>(getChatHistoryPaginationKey, fetcher, {
+  } = useSWRInfinite<ChatHistory>(getChatHistoryPaginationKey(workspaceId), fetcher, {
     fallbackData: [],
   });
 

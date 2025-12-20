@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import type { UIMessage } from 'ai';
 
 import { ModelSelector } from '@/components/model-selector';
-import { VisibilitySelector, type VisibilityType } from '@/components/visibility-selector';
+// import { VisibilitySelector, type VisibilityType } from '@/components/visibility-selector';
 import { Button } from '@/components/ui/button';
 import { RotateCcw } from 'lucide-react';
 import { toast } from '@/components/toast';
@@ -14,17 +14,19 @@ import { generateUUID } from '@/lib/utils';
 interface ChatHeaderProps {
   chatId: string;
   selectedModelId: string;
-  selectedVisibilityType: VisibilityType;
+  // selectedVisibilityType: VisibilityType;
   isReadonly: boolean;
   session: Session;
-  setMessages: (messages: UIMessage[] | ((messages: UIMessage[]) => UIMessage[])) => void;
+  setMessages: (
+    messages: UIMessage[] | ((messages: UIMessage[]) => UIMessage[]),
+  ) => void;
   onChatIdChange?: (newChatId: string) => void;
 }
 
 export function ChatHeader({
   chatId,
   selectedModelId,
-  selectedVisibilityType,
+  // selectedVisibilityType,
   isReadonly,
   session,
   setMessages,
@@ -50,7 +52,9 @@ export function ChatHeader({
   };
 
   const handleClearChat = async () => {
-    const confirmClear = window.confirm('Are you sure you want to clear this chat? This will start a new conversation with a fresh history.');
+    const confirmClear = window.confirm(
+      'Are you sure you want to clear this chat? This will start a new conversation with a fresh history.',
+    );
     if (!confirmClear) return;
 
     try {
@@ -62,21 +66,21 @@ export function ChatHeader({
       if (response.ok) {
         // Generate a new chat ID for the fresh start
         const newChatId = generateUUID();
-        
+
         // Update localStorage with the new chat ID
         localStorage.setItem('supermemoryCurrentChatId', newChatId);
-        
+
         // Clear messages in the UI
         setMessages([]);
-        
+
         // Notify parent component of the chat ID change if callback provided
         if (onChatIdChange) {
           onChatIdChange(newChatId);
         }
-        
+
         // Update the URL to reflect the new chat ID
         window.history.pushState({}, '', `?id=${newChatId}`);
-        
+
         toast({
           type: 'success',
           description: 'Chat cleared! Starting fresh conversation.',
@@ -96,14 +100,8 @@ export function ChatHeader({
     <header className="flex sticky top-0 bg-background py-2 px-2 md:px-2 gap-2 z-10 border-b">
       <div className="flex flex-row gap-2 items-center">
         <ModelSelector session={session} selectedModelId={selectedModelId} />
-        {!isReadonly && (
-          <VisibilitySelector
-            chatId={chatId}
-            selectedVisibilityType={selectedVisibilityType}
-          />
-        )}
       </div>
-      
+
       <div className="flex flex-1 justify-end items-center gap-2">
         {!isReadonly && (
           <Button

@@ -1,16 +1,30 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { MemoryGraph } from '../../supermemory/packages/memory-graph/src';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import '@supermemory/memory-graph/styles.css';
+import { MemoryGraph } from '@supermemory/memory-graph';
 import { Button } from '@/components/ui/button';
 import { Network } from 'lucide-react';
 import type { DocumentWithMemories } from '@/lib/types/supermemory';
+
+interface Chat {
+  id: string;
+  title: string;
+  createdAt: Date;
+}
 
 interface MemoryGraphDialogProps {
   open?: boolean;
@@ -31,13 +45,18 @@ export function MemoryGraphDialog({
   const [currentPage, setCurrentPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [totalLoaded, setTotalLoaded] = useState(0);
+  const [chats, setChats] = useState<Chat[]>([]);
+  const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
+  const [workspaceId, setWorkspaceId] = useState<string | null>(null);
 
   // Use controlled or internal state
   const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
   const onOpenChange = controlledOnOpenChange || setInternalOpen;
 
-  // Fetch documents when dialog opens
+  // Fetch documents for the selected chat
   const fetchDocuments = useCallback(async (page: number, limit = 500) => {
+    if (!selectedChatId) return { documents: [], pagination: { currentPage: 1, totalPages: 0, totalItems: 0, limit } };
+
     try {
       const response = await fetch('/api/documents', {
         method: 'POST',
@@ -49,6 +68,7 @@ export function MemoryGraphDialog({
           limit,
           sort: 'createdAt',
           order: 'desc',
+          chatId: selectedChatId, // Include the selected chat ID
         }),
       });
 
@@ -62,7 +82,7 @@ export function MemoryGraphDialog({
       console.error('Error fetching documents:', err);
       throw err;
     }
-  }, []);
+  }, [selectedChatId]);
 
   // Load initial documents
   const loadInitialDocuments = useCallback(async () => {
@@ -80,6 +100,48 @@ export function MemoryGraphDialog({
       setIsLoading(false);
     }
   }, [fetchDocuments]);
+
+  const loadWorkspaceAndChats = useCallback(async () => {
+    try {
+      // Fetch workspaces
+      const workspacesRes = await fetch('/api/workspaces');
+      if (!workspacesRes.ok) return;
+
+      const workspacesData = await workspacesRes.json();
+      const firstWorkspace = workspacesData?.workspaces?.[0];
+      if (!firstWorkspace) return;
+
+      setWorkspaceId(firstWorkspace.id);
+
+      // Fetch chats for this workspace
+      const chatsRes = await fetch(`/api/history?workspaceId=${firstWorkspace.id}&limit=100`);
+      if (!chatsRes.ok) return;
+
+      const chatsData = await chatsRes.json();
+      setChats(chatsData.chats || []);
+
+      // Select first chat by default
+      if (chatsData.chats && chatsData.chats.length > 0) {
+        setSelectedChatId(chatsData.chats[0].id);
+      }
+    } catch (error) {
+      console.error('[MemoryGraphDialog] Failed to load workspace and chats:', error);
+    }
+  }, []);
+
+  // Fetch workspace and chats when dialog opens
+  useEffect(() => {
+    if (open) {
+      loadWorkspaceAndChats();
+    }
+  }, [open, loadWorkspaceAndChats]);
+
+  // Reload documents when selected chat changes
+  useEffect(() => {
+    if (selectedChatId) {
+      loadInitialDocuments();
+    }
+  }, [selectedChatId, loadInitialDocuments]);
 
   // Load more documents (pagination)
   const loadMoreDocuments = useCallback(async () => {
@@ -131,21 +193,37 @@ export function MemoryGraphDialog({
           Memory Graph
         </Button>
         <Dialog open={open} onOpenChange={handleOpenChange}>
-          <DialogContent className="w-[95vw] h-[95vh] max-w-7xl p-0 overflow-hidden">
-            <DialogHeader className="sr-only">
-              <DialogTitle>Memory Graph Visualization</DialogTitle>
+          <DialogContent className="w-[95vw] h-[95vh] max-w-7xl p-0 overflow-hidden flex flex-col">
+            <DialogHeader className="px-6 pt-6 pb-4 border-b">
+              <div className="flex items-center justify-between">
+                <DialogTitle>Memory Graph - Channel View</DialogTitle>
+                <Select value={selectedChatId || undefined} onValueChange={setSelectedChatId}>
+                  <SelectTrigger className="w-[300px]">
+                    <SelectValue placeholder="Select a channel..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {chats.map((chat) => (
+                      <SelectItem key={chat.id} value={chat.id}>
+                        {chat.title || 'Untitled Chat'}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </DialogHeader>
-            <MemoryGraph
-              documents={documents}
-              isLoading={isLoading}
-              isLoadingMore={isLoadingMore}
-              error={error}
-              totalLoaded={totalLoaded}
-              hasMore={hasMore}
-              loadMoreDocuments={loadMoreDocuments}
-              variant="consumer"
-              showSpacesSelector={false}
-            />
+            <div className="flex-1 overflow-hidden">
+              <MemoryGraph
+                documents={documents}
+                isLoading={isLoading}
+                isLoadingMore={isLoadingMore}
+                error={error}
+                totalLoaded={totalLoaded}
+                hasMore={hasMore}
+                loadMoreDocuments={loadMoreDocuments}
+                variant="consumer"
+                showSpacesSelector={false}
+              />
+            </div>
           </DialogContent>
         </Dialog>
       </>
@@ -155,21 +233,37 @@ export function MemoryGraphDialog({
   // Render just the dialog (controlled externally)
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="w-[95vw] h-[95vh] max-w-7xl p-0 overflow-hidden">
-        <DialogHeader className="sr-only">
-          <DialogTitle>Memory Graph Visualization</DialogTitle>
+      <DialogContent className="w-[95vw] h-[95vh] max-w-7xl p-0 overflow-hidden flex flex-col">
+        <DialogHeader className="px-6 pt-6 pb-4 border-b">
+          <div className="flex items-center justify-between">
+            <DialogTitle>Memory Graph - Channel View</DialogTitle>
+            <Select value={selectedChatId || undefined} onValueChange={setSelectedChatId}>
+              <SelectTrigger className="w-[300px]">
+                <SelectValue placeholder="Select a channel..." />
+              </SelectTrigger>
+              <SelectContent>
+                {chats.map((chat) => (
+                  <SelectItem key={chat.id} value={chat.id}>
+                    {chat.title || 'Untitled Chat'}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </DialogHeader>
-        <MemoryGraph
-          documents={documents}
-          isLoading={isLoading}
-          isLoadingMore={isLoadingMore}
-          error={error}
-          totalLoaded={totalLoaded}
-          hasMore={hasMore}
-          loadMoreDocuments={loadMoreDocuments}
-          variant="consumer"
-          showSpacesSelector={false}
-        />
+        <div className="flex-1 overflow-hidden">
+          <MemoryGraph
+            documents={documents}
+            isLoading={isLoading}
+            isLoadingMore={isLoadingMore}
+            error={error}
+            totalLoaded={totalLoaded}
+            hasMore={hasMore}
+            loadMoreDocuments={loadMoreDocuments}
+            variant="consumer"
+            showSpacesSelector={false}
+          />
+        </div>
       </DialogContent>
     </Dialog>
   );

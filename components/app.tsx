@@ -8,7 +8,6 @@ import type { Conversation, Message, Reaction, Attachment } from '../types';
 import { generateUUID } from '@/lib/utils';
 import {
   createInitialConversationsForUser,
-  getUserSpecificSupermemoryId,
   getUserSpecificProfileId,
 } from '../data/initial-conversations';
 import { createInitialContactsForUser } from '../data/initial-contacts';
@@ -47,7 +46,8 @@ export default function App() {
   const [isCommandMenuOpen, setIsCommandMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(soundEffects.isEnabled());
-  const [pendingProfileRefresh, setPendingProfileRefresh] = useState(false);
+  const [workspaceId, setWorkspaceId] = useState<string | null>(null);
+  const [hasLoadedWorkspaceChats, setHasLoadedWorkspaceChats] = useState(false);
 
   // Add command menu ref
   const commandMenuRef = useRef<{ setOpen: (open: boolean) => void }>(null);
@@ -416,11 +416,67 @@ export default function App() {
     }
   }, [conversations]);
 
+  // Fetch workspaces on mount, auto-create if none exist
+  useEffect(() => {
+    let cancelled = false;
+    async function loadWorkspaces() {
+      try {
+        const res = await fetch('/api/workspaces');
+        if (!res.ok) {
+          console.error('[App] Failed to fetch workspaces:', res.status, res.statusText);
+          const errorText = await res.text().catch(() => '');
+          console.error('[App] Error response:', errorText);
+          return;
+        }
+        const data = await res.json();
+        console.log('[App] Workspaces loaded:', data);
+
+        // If no workspaces exist, create a default one for regular users
+        if (data.workspaces.length === 0) {
+          console.log('[App] No workspaces found, creating default workspace');
+          const createRes = await fetch('/api/workspaces', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: 'My Workspace' }),
+          });
+
+          if (createRes.ok) {
+            const { workspace } = await createRes.json();
+            if (!cancelled) {
+              setWorkspaceId(workspace.id);
+              console.log('[App] Created and selected default workspace:', workspace.id);
+            }
+            return;
+          } else {
+            console.error('[App] Failed to create default workspace:', createRes.status);
+            return;
+          }
+        }
+
+        const first = data?.workspaces?.[0]?.id ?? null;
+        if (!cancelled) {
+          setWorkspaceId(first);
+          console.log('[App] Selected workspace:', first);
+        }
+      } catch (error) {
+        console.error('[App] Failed to load workspaces:', error);
+      }
+    }
+    loadWorkspaces();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // Initialize user ID early
   useEffect(() => {
     const fetchUserId = async () => {
       try {
-        const response = await fetch('/api/profile');
+        const response = await fetch('/api/profile', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({}), // No chatId means user-scoped fallback
+        });
         if (response.ok) {
           const { profile } = await response.json();
           setUserId(profile.userId);
@@ -433,117 +489,7 @@ export default function App() {
     fetchUserId();
   }, []); // Run only once on mount
 
-  // Fetch and update user profile for the profile chat
-  const updateProfileChat = useCallback(async () => {
-    try {
-      const response = await fetch('/api/profile');
-      if (response.ok) {
-        const { profile } = await response.json();
-
-        // Set the user ID for use throughout the app
-        setUserId(profile.userId);
-
-        // Show container tag and static/dynamic profile data with proper labels
-        let profileContent = `**Container Tag:**\n${profile.userId}\n\n`;
-
-        // Show static profile data
-        if (profile.static && profile.static.length > 0) {
-          profileContent += `**Static:**\n`;
-          profile.static.forEach((item: any) => {
-            profileContent += `• ${item}\n\n`;
-          });
-        }
-
-        // Show dynamic profile data
-        if (profile.dynamic && profile.dynamic.length > 0) {
-          profileContent += `**Dynamic:**\n`;
-          profile.dynamic.forEach((item: any) => {
-            profileContent += `• ${item}\n\n`;
-          });
-        }
-
-        if (!profile.static?.length && !profile.dynamic?.length) {
-          profileContent += `**Static:**\n(empty)\n\n**Dynamic:**\n(empty)`;
-        }
-
-        // Update the profile chat with the new profile content
-        const userProfileChatId = getUserSpecificProfileId(profile.userId);
-        setConversations((prev) =>
-          prev.map((conv) => {
-            if (conv.id === userProfileChatId) {
-              return {
-                ...conv,
-                messages: [
-                  {
-                    id: `${getUserSpecificProfileId(profile.userId)}-question`,
-                    content: 'who am i',
-                    sender: 'me',
-                    timestamp: new Date(Date.now() - 60000).toISOString(),
-                  },
-                  {
-                    id: `${getUserSpecificProfileId(profile.userId)}-response`,
-                    content: profileContent,
-                    sender: 'Profile',
-                    timestamp: new Date().toISOString(),
-                  },
-                ],
-                lastMessageTime: new Date().toISOString(),
-              };
-            }
-            return conv;
-          }),
-        );
-      }
-    } catch (error) {
-      console.error('Error fetching profile:', error);
-    }
-  }, []);
-
-  // Fetch profile every time profile chat becomes active
-  // Track if we just switched to the profile chat
-  const [lastProfileChatView, setLastProfileChatView] = useState<number>(0);
-
-  useEffect(() => {
-    if (userId && activeConversation === getUserSpecificProfileId(userId)) {
-      // Always fetch when switching to profile chat
-      updateProfileChat();
-      setLastProfileChatView(Date.now());
-
-      // Auto-refresh every 30 seconds while viewing profile
-      const interval = setInterval(updateProfileChat, 30000);
-      return () => clearInterval(interval);
-    }
-  }, [activeConversation, updateProfileChat, userId]);
-
-  // Function to trigger automatic profile refresh after Supermemory responses
-  const triggerProfileRefresh = useCallback(() => {
-    if (!userId) return;
-
-    setPendingProfileRefresh(true);
-
-    // Show notification that profile will be updated
-    toast({
-      description: 'Updating your profile with new information...',
-    });
-
-    // Wait 10 seconds then refresh profile
-    setTimeout(() => {
-      updateProfileChat()
-        .then(() => {
-          setPendingProfileRefresh(false);
-          toast({
-            description: 'Profile updated with latest information!',
-          });
-        })
-        .catch((error) => {
-          console.error('Error updating profile:', error);
-          setPendingProfileRefresh(false);
-          toast({
-            description: 'Profile update completed.',
-          });
-        });
-    }, 10000); // 10 second delay
-  }, [userId, updateProfileChat, toast]);
+  // Profile chat is now a channel memory graph view; no periodic profile polling needed.
 
   // Set mobile view
   useEffect(() => {
@@ -592,40 +538,9 @@ export default function App() {
       const urlParams = new URLSearchParams(window.location.search);
       const urlConversationId = urlParams.get('id');
 
-      // Get or generate the chat ID for this user
-      let chatId: string = localStorage.getItem(CHAT_ID_KEY) || '';
-
-      // Try to fetch existing chats from API if we don't have a stored ID
-      if (!chatId) {
-        try {
-          const response = await fetch('/api/history');
-          if (response.ok) {
-            const chats = await response.json();
-            if (chats && chats.length > 0 && chats[0]?.id) {
-              // Use the most recent chat
-              chatId = chats[0].id as string;
-            }
-          }
-        } catch (error) {
-          console.error('Error fetching chat history:', error);
-        }
-      }
-
-      // If still no chat ID, generate a new one
-      if (!chatId) {
-        chatId = generateUUID();
-      }
-
-      // Store the final chat ID
-      localStorage.setItem(CHAT_ID_KEY, chatId);
-
       // Start with initial conversations using user-specific IDs
       const initialConversations = createInitialConversationsForUser(userId);
-      const userSupermemoryId = getUserSpecificSupermemoryId(userId);
-
-      let allConversations = initialConversations.map((conv) =>
-        conv.id === userSupermemoryId ? { ...conv, id: chatId } : conv,
-      );
+      let allConversations = [...initialConversations];
 
       if (saved) {
         try {
@@ -637,22 +552,13 @@ export default function App() {
             return;
           }
 
-          // Migration: Update old IDs to the current user's chat ID
-          const migratedConversations = parsedConversations.map((conv) => {
-            if (
-              conv.id === 'supermemory-chat' ||
-              conv.id === userSupermemoryId
-            ) {
-              return { ...conv, id: chatId };
-            }
-            return conv;
-          });
+          // Migration: drop legacy pinned "Supermemory" conversation if present
+          const migratedConversations = parsedConversations.filter(
+            (conv: any) => conv?.recipients?.[0]?.name !== 'Supermemory',
+          );
 
           // Create a map of initial conversation IDs for faster lookup
-          const initialIds = new Set([
-            chatId,
-            ...initialConversations.map((conv) => conv.id),
-          ]);
+          const initialIds = new Set([...initialConversations.map((conv) => conv.id)]);
 
           // Separate user-created and modified initial conversations
           const userConversations = [];
@@ -685,24 +591,13 @@ export default function App() {
 
       // Handle conversation selection after setting conversations
       if (urlConversationId) {
-        // Migration: Update URL if it has the old ID
-        const migratedUrlId =
-          urlConversationId === 'supermemory-chat' ||
-          urlConversationId === getUserSpecificSupermemoryId(userId)
-            ? chatId
-            : urlConversationId;
-
         // Check if the URL conversation exists
         const conversationExists = allConversations.some(
-          (c) => c.id === migratedUrlId,
+          (c) => c.id === urlConversationId,
         );
         if (conversationExists) {
           // If it exists, select it
-          setActiveConversation(migratedUrlId);
-          // Update URL if it was migrated
-          if (migratedUrlId !== urlConversationId) {
-            window.history.pushState({}, '', `?id=${migratedUrlId}`);
-          }
+          setActiveConversation(urlConversationId);
           return;
         }
       }
@@ -726,6 +621,122 @@ export default function App() {
     // Call the async initialization function
     initializeConversations();
   }, [userId, isMobileView, startNewConversation]); // Add userId as dependency
+
+  // Load workspace channels from DB history once we have a workspaceId
+  useEffect(() => {
+    if (!workspaceId || !userId) return;
+
+    let cancelled = false;
+
+    async function loadWorkspaceChats() {
+      try {
+        const res = await fetch(
+          `/api/history?workspaceId=${workspaceId}&limit=100`,
+        );
+        if (!res.ok) {
+          console.error('[App] Failed to fetch workspace chats:', res.status);
+          return;
+        }
+        const data = await res.json();
+        const chats = data?.chats ?? [];
+
+        setConversations((prev) => {
+          const byId = new Map(prev.map((c) => [c.id, c]));
+
+          for (const chat of chats) {
+            const existing = byId.get(chat.id);
+            byId.set(chat.id, {
+              id: chat.id,
+              name: chat.title || 'Untitled Chat',
+              recipients: [
+                {
+                  id: 'ai',
+                  name: 'Supermemory',
+                  bio: 'Workspace AI assistant',
+                  title: 'AI',
+                },
+              ],
+              messages: existing?.messages ?? [],
+              lastMessageTime: new Date(chat.createdAt).toISOString(),
+              unreadCount: 0,
+              pinned: chat.title === 'setup' ? true : existing?.pinned,
+            });
+          }
+
+          // Ensure profile conversation exists
+          const profileId = getUserSpecificProfileId(userId);
+          if (!byId.has(profileId)) {
+            const [profileConv] = createInitialConversationsForUser(userId);
+            byId.set(profileId, profileConv);
+          }
+
+          return Array.from(byId.values());
+        });
+
+        if (!cancelled) setHasLoadedWorkspaceChats(true);
+      } catch (e) {
+        console.error('[App] Error loading workspace chats:', e);
+      }
+    }
+
+    loadWorkspaceChats();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [workspaceId, userId]);
+
+  // Hydrate messages from DB for the active channel when needed
+  useEffect(() => {
+    if (!activeConversation) return;
+    if (!hasLoadedWorkspaceChats) return;
+
+    const conv = conversations.find((c) => c.id === activeConversation);
+    if (!conv) return;
+
+    const isProfile = conv.recipients.some((r) => r.name === 'Profile');
+    if (isProfile) return;
+    if (conv.messages.length > 0) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/messages?chatId=${conv.id}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (cancelled) return;
+
+        setConversations((prev) =>
+          prev.map((c) =>
+            c.id === conv.id ? { ...c, messages: data.messages ?? [] } : c,
+          ),
+        );
+      } catch (e) {
+        console.error('[App] Failed to hydrate messages:', e);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeConversation, conversations, hasLoadedWorkspaceChats]);
+
+  // Prefer selecting the seeded `setup` channel once workspace chats are loaded
+  useEffect(() => {
+    if (!userId) return;
+    if (!hasLoadedWorkspaceChats) return;
+
+    const profileId = getUserSpecificProfileId(userId);
+    const setup = conversations.find((c) => c.name === 'setup');
+
+    if (!setup) return;
+
+    // Only auto-select on initial load; don't override a deliberate Profile selection.
+    if (!activeConversation) {
+      setActiveConversation(setup.id);
+      window.history.pushState({}, '', `?id=${setup.id}`);
+    }
+  }, [userId, hasLoadedWorkspaceChats, conversations, activeConversation]);
 
   // Update lastActiveConversation whenever activeConversation changes
   useEffect(() => {
@@ -766,37 +777,7 @@ export default function App() {
             soundEffects.playUnreadSound();
           }
 
-          // Trigger profile refresh for Supermemory responses (not from user, not in profile chat)
-          const isSupermemoryChat =
-            userId && conversationId === getUserSpecificSupermemoryId(userId);
-          const isProfileChat =
-            userId && conversationId === getUserSpecificProfileId(userId);
-
-          console.log('[Profile Refresh Debug]', {
-            conversationId,
-            userId,
-            supermemoryId: userId ? getUserSpecificSupermemoryId(userId) : null,
-            profileId: userId ? getUserSpecificProfileId(userId) : null,
-            isSupermemoryChat,
-            isProfileChat,
-            messageSender: message.sender,
-            pendingProfileRefresh,
-            shouldTrigger:
-              isSupermemoryChat &&
-              message.sender !== 'me' &&
-              !isProfileChat &&
-              !pendingProfileRefresh,
-          });
-
-          if (
-            isSupermemoryChat &&
-            message.sender !== 'me' &&
-            !isProfileChat &&
-            !pendingProfileRefresh
-          ) {
-            console.log('[Profile Refresh] Triggering profile refresh...');
-            triggerProfileRefresh();
-          }
+          // No auto profile-refresh behavior in channel-scoped memory mode.
 
           return prev.map((conv) =>
             conv.id === conversationId
@@ -929,9 +910,8 @@ export default function App() {
     if (!messageText.trim() && (!attachments || attachments.length === 0))
       return;
 
-    // Use the provided conversationId, or default to the main Supermemory chat
-    const targetConversationId =
-      conversationId || getUserSpecificSupermemoryId(userId || '');
+    // Use the provided conversationId, or fall back to the currently active conversation
+    const targetConversationId = conversationId || activeConversation || '';
     const conversation = conversations.find(
       (c) => c.id === targetConversationId,
     );
@@ -976,16 +956,22 @@ export default function App() {
       current === targetConversationId ? null : current,
     );
     window.history.pushState({}, '', `?id=${targetConversationId}`);
-    messageQueue.current.enqueueUserMessage(updatedConversation);
+
+    // Only enqueue if we have a workspaceId
+    if (workspaceId) {
+      messageQueue.current.enqueueUserMessage(updatedConversation, workspaceId);
+    } else {
+      console.error('[App] Cannot send message: no workspace selected');
+    }
     clearMessageDraft(targetConversationId);
   };
 
   // Method to handle conversation deletion
   const handleDeleteConversation = (id: string) => {
-    // Don't allow deleting the Supermemory conversation
-    if (id === getUserSpecificSupermemoryId(userId || '')) {
+    // Don't allow deleting the Profile conversation
+    if (id === getUserSpecificProfileId(userId || '')) {
       toast({
-        description: 'Cannot delete the Supermemory conversation',
+        description: 'Cannot delete the Profile conversation',
       });
       return;
     }
@@ -1266,6 +1252,7 @@ export default function App() {
                   : false
               }
               userId={userId || undefined}
+              workspaceId={workspaceId}
             />
           </div>
         </div>

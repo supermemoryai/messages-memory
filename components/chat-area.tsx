@@ -49,6 +49,7 @@ interface ChatAreaProps {
   onClearChat?: () => void;
   isReadOnly?: boolean;
   userId?: string;
+  workspaceId?: string | null;
 }
 
 export function ChatArea({
@@ -73,6 +74,7 @@ export function ChatArea({
   onClearChat,
   isReadOnly = false,
   userId,
+  workspaceId,
 }: ChatAreaProps) {
   const [inputValue, setInputValue] = useState(messageDraft);
   const [submittedForm, setSubmittedForm] = useState<boolean>(false);
@@ -242,6 +244,15 @@ export function ChatArea({
       setSubmittedForm(false);
     }
   }, [conversationId]);
+
+  // If the current conversation doesn't have any form messages, don't gate input behind "submittedForm".
+  useEffect(() => {
+    const hasForm =
+      activeConversation?.messages?.some((m: any) => Boolean(m?.form)) ?? false;
+    if (!hasForm) {
+      setSubmittedForm(true);
+    }
+  }, [activeConversation?.id]);
 
   const handleInputChange = (value: string) => {
     setInputValue(value);
@@ -760,7 +771,7 @@ export function ChatArea({
 
         {/* Right side: Memory Graph (50%) */}
         <div className="w-1/2 h-full border-l border-border">
-          <MemoryGraphView isActive={true} />
+          <MemoryGraphView isActive={true} workspaceId={workspaceId} />
         </div>
       </div>
     );
