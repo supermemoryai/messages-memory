@@ -1,9 +1,10 @@
 import { auth } from '@/app/(auth)/auth';
 import { NextResponse } from 'next/server';
+import { getChatById, getWorkspaceMember } from '@/lib/db/queries';
 
 export const maxDuration = 30;
 
-export async function GET(request: Request) {
+export async function POST(request: Request) {
   try {
     const session = await auth();
 
@@ -11,9 +12,31 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Always use user ID as container tag
-    const containerTag = session.user.id;
-    console.log('[Profile API] Using container tag:', containerTag);
+    // Parse request body to get chatId (channel ID)
+    const body = await request.json();
+    const { chatId } = body;
+
+    // If requesting channel-scoped profile, enforce workspace membership for that chatId
+    if (chatId) {
+      const chat = await getChatById({ id: chatId });
+      if (!chat) {
+        return NextResponse.json({ error: 'Chat not found' }, { status: 404 });
+      }
+
+      const member = await getWorkspaceMember({
+        workspaceId: chat.workspaceId,
+        userId: session.user.id,
+      });
+
+      if (!member) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+    }
+
+    // Use chatId as container tag for channel-scoped memory
+    // If no chatId provided, fall back to user ID for backward compatibility
+    const containerTag = chatId || session.user.id;
+    console.log('[Profile API] Using container tag:', containerTag, chatId ? '(channel-scoped)' : '(user-scoped fallback)');
 
     // Fetch user profile from Supermemory using search with profile mode
     if (!process.env.SUPERMEMORY_API_KEY) {
@@ -34,7 +57,7 @@ export async function GET(request: Request) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-api-key': process.env.SUPERMEMORY_API_KEY,
+          Authorization: `Bearer ${process.env.SUPERMEMORY_API_KEY}`,
         },
         body: JSON.stringify({
           containerTag: containerTag,
