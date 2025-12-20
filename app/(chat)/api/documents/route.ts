@@ -1,5 +1,6 @@
 import { auth } from '@/app/(auth)/auth';
 import { NextResponse } from 'next/server';
+import { getChatById, getWorkspaceMember } from '@/lib/db/queries';
 
 export const maxDuration = 30;
 
@@ -25,11 +26,34 @@ export async function POST(request: Request) {
       limit = 500, // Start with 500 documents
       sort = 'createdAt',
       order = 'desc',
+      chatId, // Accept chatId to use as containerTag
     } = body;
 
-    // Always use user ID as container tag
-    const containerTag = session.user.id;
-    console.log('[Documents API] Using container tag:', containerTag);
+    // If requesting channel-scoped docs, enforce workspace membership for that chatId
+    if (chatId) {
+      const chat = await getChatById({ id: chatId });
+      if (!chat) {
+        return NextResponse.json({ error: 'Chat not found' }, { status: 404 });
+      }
+
+      const member = await getWorkspaceMember({
+        workspaceId: chat.workspaceId,
+        userId: session.user.id,
+      });
+
+      if (!member) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+    }
+
+    // Use chatId as container tag for channel-scoped memory
+    // If no chatId provided, fall back to user ID for backward compatibility
+    const containerTag = chatId || session.user.id;
+    console.log(
+      '[Documents API] Using container tag:',
+      containerTag,
+      chatId ? '(channel-scoped)' : '(user-scoped fallback)',
+    );
     console.log('[Documents API] Fetching page:', page, 'limit:', limit);
 
     try {
@@ -40,7 +64,7 @@ export async function POST(request: Request) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-api-key': process.env.SUPERMEMORY_API_KEY,
+          Authorization: `Bearer ${process.env.SUPERMEMORY_API_KEY}`,
         },
         body: JSON.stringify({
           page,
