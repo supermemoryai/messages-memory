@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/app/(auth)/auth';
 import { deleteMessagesByChatId } from '@/lib/db/queries';
-import { getUserSpecificProfileId } from '@/data/initial-conversations';
 
 export async function DELETE(request: Request) {
   try {
@@ -17,10 +16,12 @@ export async function DELETE(request: Request) {
       return new NextResponse('Chat ID is required', { status: 400 });
     }
 
-    // Get the container tag to delete from Supermemory
-    const containerTag = session.user.id;
+    // Get the container tag to delete from Supermemory (now using chatId)
+    const containerTag = chatId;
     console.log(
-      '[Delete All] Starting deletion for containerTag:',
+      '[Delete All] Starting deletion for chat:',
+      chatId,
+      'with containerTag:',
       containerTag,
     );
 
@@ -86,16 +87,6 @@ export async function DELETE(request: Request) {
 
     // Delete conversation history from the current chat
     await deleteMessagesByChatId({ id: chatId });
-
-    // Also delete the profile chat messages since the profile data is now gone
-    const profileChatId = getUserSpecificProfileId(session.user.id);
-    try {
-      await deleteMessagesByChatId({ id: profileChatId });
-      console.log('[Delete All] Cleared profile chat messages');
-    } catch (error) {
-      console.error('[Delete All] Error clearing profile chat:', error);
-      // Don't fail the whole operation if profile chat deletion fails
-    }
 
     return NextResponse.json(
       {

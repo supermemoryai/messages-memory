@@ -9,7 +9,7 @@ const getTimeAgo = (minutes: number) => {
 };
 
 // Generate deterministic but user-specific UUIDs using secure hash
-const generateUserSpecificId = (userId: string, suffix: string): string => {
+const generateWorkspaceSpecificId = (userId: string, suffix: string): string => {
   const hash = createHash('sha256').update(`${userId}-${suffix}`).digest('hex');
   // Convert to UUID format: 8-4-4-4-12
   return [
@@ -21,17 +21,17 @@ const generateUserSpecificId = (userId: string, suffix: string): string => {
   ].join('-');
 };
 
-// Factory function to create user-specific initial conversations
-export const createInitialConversationsForUser = (
-  userId: string,
+// Factory function to create workspace-specific initial conversations
+export const createInitialConversationsForWorkspace = (
+  workspaceId: string,
 ): Conversation[] => {
-  const profileId = generateUserSpecificId(userId, 'profile-chat');
-  const profileAssistantId = generateUserSpecificId(
-    userId,
+  const profileId = generateWorkspaceSpecificId(workspaceId, 'profile-chat');
+  const profileAssistantId = generateWorkspaceSpecificId(
+    workspaceId,
     'profile-assistant',
   );
-  const profileQuestionId = generateUserSpecificId(userId, 'profile-question');
-  const profileResponseId = generateUserSpecificId(userId, 'profile-response');
+  const profileQuestionId = generateWorkspaceSpecificId(workspaceId, 'profile-question');
+  const profileResponseId = generateWorkspaceSpecificId(workspaceId, 'profile-response');
 
   return [
     {
@@ -65,10 +65,10 @@ export const createInitialConversationsForUser = (
   ];
 };
 
-// Helper functions to get user-specific IDs
-export const getUserSpecificProfileId = (userId: string): string =>
-  generateUserSpecificId(userId, 'profile-chat');
+// Helper function to get workspace-specific Profile chat ID
+export const getWorkspaceSpecificProfileId = (workspaceId: string): string =>
+  generateWorkspaceSpecificId(workspaceId, 'profile-chat');
 
-// Legacy export for backward compatibility - but now requires userId
-export const getInitialConversations = (userId: string): Conversation[] =>
-  createInitialConversationsForUser(userId);
+// Legacy export for backward compatibility - now requires workspaceId
+export const getInitialConversations = (workspaceId: string): Conversation[] =>
+  createInitialConversationsForWorkspace(workspaceId);
