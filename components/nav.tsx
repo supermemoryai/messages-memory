@@ -1,6 +1,8 @@
 import { useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { ThemeToggle } from './theme-toggle';
+import { InviteButton } from './invite-button';
+import { WorkspaceSwitcher } from './workspace-switcher';
 
 interface NavProps {
   onNewChat: () => void;
@@ -67,6 +69,7 @@ export function Nav({ onNewChat, isMobileView, isScrolled }: NavProps) {
           </button>
         </div>
         <div className="flex items-center gap-1">
+          <InviteButton />
           <ThemeToggle />
         </div>
       </div>
