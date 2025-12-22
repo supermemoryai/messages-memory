@@ -7,19 +7,29 @@ import { Nav } from './nav';
 import type { Conversation, Message, Reaction, Attachment } from '../types';
 import { generateUUID } from '@/lib/utils';
 import {
-  createInitialConversationsForUser,
-  getUserSpecificProfileId,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  createInitialConversationsForWorkspace,
+  getWorkspaceSpecificProfileId,
 } from '../data/initial-conversations';
 import { createInitialContactsForUser } from '../data/initial-contacts';
 import { MessageQueue } from '../lib/message-queue';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from '@/components/toast';
 import { CommandMenu } from './command-menu';
 import { soundEffects } from '@/lib/sound-effects';
 import { getUserContacts } from '@/lib/contacts';
 
 export default function App() {
   // State
-  const { toast } = useToast();
   const [isNewConversation, setIsNewConversation] = useState(false);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversation, setActiveConversation] = useState<string | null>(
@@ -47,18 +57,47 @@ export default function App() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(soundEffects.isEnabled());
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
-  const [loadedConversations, setLoadedConversations] = useState<Set<string>>(new Set());
+  const [loadedConversations, setLoadedConversations] = useState<Set<string>>(
+    new Set(),
+  );
   const [hasLoadedWorkspaceChats, setHasLoadedWorkspaceChats] = useState(false);
+  const [workspaceAccessError, setWorkspaceAccessError] = useState<
+    string | null
+  >(null);
+  const [showRenameChatDialog, setShowRenameChatDialog] = useState(false);
+  const [renameChatId, setRenameChatId] = useState<string | null>(null);
+  const [renameChatName, setRenameChatName] = useState('');
+  const [renamingChat, setRenamingChat] = useState(false);
+  const [showCreateChatDialog, setShowCreateChatDialog] = useState(false);
+  const [newChatName, setNewChatName] = useState('');
+  const [creatingChat, setCreatingChat] = useState(false);
+  const [chatNameError, setChatNameError] = useState('');
 
   // Add command menu ref
   const commandMenuRef = useRef<{ setOpen: (open: boolean) => void }>(null);
+  const hasSelectedFromUrl = useRef(false);
+  const isSwitchingWorkspace = useRef(false);
+  const workspaceIdRef = useRef<string | null>(null);
+  const currentActiveChatIdRef = useRef<string | null>(null);
 
-  const STORAGE_KEY = 'supermemoryConversations';
-  const CHAT_ID_KEY = 'supermemoryCurrentChatId';
+  // const STORAGE_KEY = 'supermemoryConversations';
+  // const CHAT_ID_KEY = 'supermemoryCurrentChatId';
+  const WORKSPACE_ID_KEY = 'sunsetLastWorkspace';
+  const getConversationsStorageKey = () => {
+    const id = workspaceIdRef.current;
+    return id ? `sunsetConversations-${id}` : null;
+  };
+
+  const getChatIdStorageKey = () => {
+    const id = workspaceIdRef.current;
+    return id ? `sunsetCurrentChatId-${id}` : null;
+  };
 
   const removeDraftConversation = useCallback(
     (conversationId: string | null) => {
       if (!conversationId) return;
+      const conversationKey = getConversationsStorageKey();
+      if (!conversationKey) return;
 
       let draftRemoved = false;
       setConversations((prev) => {
@@ -70,7 +109,10 @@ export default function App() {
         }
         draftRemoved = true;
         const updated = prev.filter((conv) => conv.id !== conversationId);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+        localStorage.setItem(
+          conversationKey,
+          JSON.stringify(updated),
+        );
         return updated;
       });
 
@@ -87,87 +129,92 @@ export default function App() {
         );
       }
     },
-    [STORAGE_KEY],
+    [],
   );
 
-  const startNewConversation = useCallback((
-    options?: { baseConversation?: Conversation }
-  ) => {
-    if (draftConversationId) {
-      removeDraftConversation(draftConversationId);
-    }
+  const startNewConversation = useCallback(
+    (options?: { baseConversation?: Conversation }) => {
+      const chatIdKey = getChatIdStorageKey();
+      const conversationKey = getConversationsStorageKey();
+      if (!conversationKey) return;
 
-    const newConversationId = generateUUID();
-    const now = new Date().toISOString();
-    const baseConversation = options?.baseConversation;
-
-    const baseRecipients =
-      baseConversation?.recipients?.map((recipient) => ({ ...recipient })) || [];
-    const conversationName =
-      baseConversation?.name ||
-      (baseRecipients.length > 0
-        ? baseRecipients.map((recipient) => recipient.name).join(', ')
-        : 'New Chat');
-
-    const newConversation: Conversation = {
-      id: newConversationId,
-      name: conversationName,
-      recipients: baseRecipients,
-      messages: [],
-      lastMessageTime: now,
-      unreadCount: 0,
-      isDraft: baseRecipients.length === 0,
-      pinned: baseConversation?.pinned,
-      hideAlerts: baseConversation?.hideAlerts,
-    };
-
-    setConversations((prev) => {
-      const filtered = baseConversation
-        ? prev.filter((conv) => conv.id !== baseConversation.id)
-        : prev;
-      const updated = [newConversation, ...filtered];
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-      return updated;
-    });
-
-    setDraftConversationId(
-      baseRecipients.length === 0 ? newConversationId : null,
-    );
-    setActiveConversation(newConversationId);
-    setIsNewConversation(baseRecipients.length === 0);
-    setRecipientInput(
-      baseRecipients.length > 0
-        ? baseRecipients.map((recipient) => recipient.name).join(',')
-        : '',
-    );
-    setMessageDrafts((prev) => {
-      const { new: _unusedDraft, ...restWithoutNew } = prev;
-      let cleanedDrafts = restWithoutNew;
-      if (baseConversation) {
-        const { [baseConversation.id]: _removed, ...withoutBase } = cleanedDrafts;
-        cleanedDrafts = withoutBase;
+      if (draftConversationId) {
+        removeDraftConversation(draftConversationId);
       }
-      return {
-        ...cleanedDrafts,
-        [newConversationId]: '',
+
+      const newConversationId = generateUUID();
+      const now = new Date().toISOString();
+      const baseConversation = options?.baseConversation;
+
+      const baseRecipients =
+        baseConversation?.recipients?.map((recipient) => ({ ...recipient })) ||
+        [];
+      const conversationName =
+        baseConversation?.name ||
+        (baseRecipients.length > 0
+          ? baseRecipients.map((recipient) => recipient.name).join(', ')
+          : 'New Chat');
+
+      const newConversation: Conversation = {
+        id: newConversationId,
+        name: conversationName,
+        recipients: baseRecipients,
+        messages: [],
+        lastMessageTime: now,
+        unreadCount: 0,
+        isDraft: baseRecipients.length === 0,
+        pinned: baseConversation?.pinned,
+        hideAlerts: baseConversation?.hideAlerts,
       };
-    });
-    if (baseConversation) {
-      setLastActiveConversation((prev) =>
-        prev === baseConversation.id ? newConversationId : prev,
+
+      setConversations((prev) => {
+        const filtered = baseConversation
+          ? prev.filter((conv) => conv.id !== baseConversation.id)
+          : prev;
+        const updated = [newConversation, ...filtered];
+        localStorage.setItem(conversationKey, JSON.stringify(updated));
+        return updated;
+      });
+
+      setDraftConversationId(
+        baseRecipients.length === 0 ? newConversationId : null,
       );
-      localStorage.setItem(CHAT_ID_KEY, newConversationId);
-    }
-    localStorage.setItem('submittedForm', `submitted-${newConversationId}`);
-    window.history.pushState({}, '', `?id=${newConversationId}`);
-  }, [
-    STORAGE_KEY,
-    CHAT_ID_KEY,
-    draftConversationId,
-    removeDraftConversation,
-    setIsNewConversation,
-    setRecipientInput,
-  ]);
+      setActiveConversation(newConversationId);
+      setIsNewConversation(baseRecipients.length === 0);
+      setRecipientInput(
+        baseRecipients.length > 0
+          ? baseRecipients.map((recipient) => recipient.name).join(',')
+          : '',
+      );
+      setMessageDrafts((prev) => {
+        const { new: _unusedDraft, ...restWithoutNew } = prev;
+        let cleanedDrafts = restWithoutNew;
+        if (baseConversation) {
+          const { [baseConversation.id]: _removed, ...withoutBase } =
+            cleanedDrafts;
+          cleanedDrafts = withoutBase;
+        }
+        return {
+          ...cleanedDrafts,
+          [newConversationId]: '',
+        };
+      });
+      if (baseConversation) {
+        setLastActiveConversation((prev) =>
+          prev === baseConversation.id ? newConversationId : prev,
+        );
+        if (chatIdKey) localStorage.setItem(chatIdKey, newConversationId);
+      }
+      localStorage.setItem('submittedForm', `submitted-${newConversationId}`);
+      window.history.pushState({}, '', `?id=${newConversationId}`);
+    },
+    [
+      draftConversationId,
+      removeDraftConversation,
+      setIsNewConversation,
+      setRecipientInput,
+    ],
+  );
 
   const buildRecipientsForConversation = useCallback(
     (
@@ -218,6 +265,8 @@ export default function App() {
       if (trimmedRecipients.length === 0) {
         return;
       }
+      const conversationKey = getConversationsStorageKey();
+      if (!conversationKey) return;
 
       let candidateConversationId: string;
       if (
@@ -255,7 +304,7 @@ export default function App() {
           };
           const updated = [...prev];
           updated[index] = updatedConversation;
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+          localStorage.setItem(conversationKey, JSON.stringify(updated));
           return updated;
         }
 
@@ -273,7 +322,7 @@ export default function App() {
           isDraft: false,
         };
         const updated = [newConversation, ...prev];
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+        localStorage.setItem(conversationKey, JSON.stringify(updated));
         return updated;
       });
 
@@ -295,7 +344,6 @@ export default function App() {
       window.history.pushState({}, '', `?id=${candidateConversationId}`);
     },
     [
-      STORAGE_KEY,
       activeConversation,
       buildRecipientsForConversation,
       conversations,
@@ -306,6 +354,8 @@ export default function App() {
   const handleUpdateRecipients = useCallback(
     (recipientNames: string[]) => {
       if (!activeConversation) return;
+      const conversationKey = getConversationsStorageKey();
+      if (!conversationKey) return;
 
       const trimmedRecipients = recipientNames
         .map((name) => name.trim())
@@ -332,11 +382,11 @@ export default function App() {
         };
         const updated = [...prev];
         updated[index] = updatedConversation;
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+        localStorage.setItem(conversationKey, JSON.stringify(updated));
         return updated;
       });
     },
-    [STORAGE_KEY, activeConversation, buildRecipientsForConversation],
+    [activeConversation, buildRecipientsForConversation],
   );
 
   // Memoized conversation selection method
@@ -385,6 +435,14 @@ export default function App() {
   );
 
   // Effects
+  //
+  useEffect(() => {
+    workspaceIdRef.current = workspaceId;
+    if (workspaceId) {
+      localStorage.setItem(WORKSPACE_ID_KEY, workspaceId);
+    }
+  }, [workspaceId]);
+
   // Ensure active conversation remains valid
   useEffect(() => {
     if (
@@ -412,8 +470,10 @@ export default function App() {
 
   // Save user's conversations to local storage
   useEffect(() => {
+    const conversationKey = getConversationsStorageKey();
+    if (!conversationKey) return;
     if (conversations.length > 0) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(conversations));
+      localStorage.setItem(conversationKey, JSON.stringify(conversations));
     }
   }, [conversations]);
 
@@ -424,7 +484,11 @@ export default function App() {
       try {
         const res = await fetch('/api/workspaces');
         if (!res.ok) {
-          console.error('[App] Failed to fetch workspaces:', res.status, res.statusText);
+          console.error(
+            '[App] Failed to fetch workspaces:',
+            res.status,
+            res.statusText,
+          );
           const errorText = await res.text().catch(() => '');
           console.error('[App] Error response:', errorText);
           return;
@@ -445,19 +509,143 @@ export default function App() {
             const { workspace } = await createRes.json();
             if (!cancelled) {
               setWorkspaceId(workspace.id);
-              console.log('[App] Created and selected default workspace:', workspace.id);
+              console.log(
+                '[App] Created and selected default workspace:',
+                workspace.id,
+              );
             }
             return;
           } else {
-            console.error('[App] Failed to create default workspace:', createRes.status);
+            console.error(
+              '[App] Failed to create default workspace:',
+              createRes.status,
+            );
             return;
           }
         }
 
-        const first = data?.workspaces?.[0]?.id ?? null;
+        // Check URL parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        const invitedWorkspaceId = urlParams.get('invitedWorkspace');
+        const chatId = urlParams.get('id');
+
+        let selectedWorkspaceId: string | null = null;
+        const lastWorkspaceId = localStorage.getItem(WORKSPACE_ID_KEY);
+
+        // Priority 1: If there's a chat ID in the URL, find its workspace
+        if (chatId) {
+          // Check if this is a Profile chat (client-side only, not in DB)
+          const matchingWorkspace = data.workspaces.find(
+            (w: any) => getWorkspaceSpecificProfileId(w.id) === chatId
+          );
+
+          if (matchingWorkspace) {
+            // This is a Profile chat - use its workspace directly
+            selectedWorkspaceId = matchingWorkspace.id;
+            console.log(
+              '[App] Selected workspace based on Profile chat ID:',
+              selectedWorkspaceId,
+            );
+            if (!cancelled) {
+              setWorkspaceAccessError(null);
+            }
+          } else {
+            // Not a Profile chat - fetch from API
+            try {
+              const chatRes = await fetch(`/api/chat/${chatId}`);
+            if (chatRes.ok) {
+              const chatData = await chatRes.json();
+              // Check if this workspace exists in the user's workspaces
+              const chatWorkspace = data.workspaces.find(
+                (w: any) => w.id === chatData.chat?.workspaceId,
+              );
+              if (chatWorkspace) {
+                selectedWorkspaceId = chatData.chat.workspaceId;
+                console.log(
+                  '[App] Selected workspace based on chat ID:',
+                  selectedWorkspaceId,
+                );
+                if (!cancelled) {
+                  setWorkspaceAccessError(null); // Clear any previous errors
+                }
+              } else {
+                // User doesn't have access to this workspace
+                console.warn(
+                  '[App] User does not have access to the workspace for this chat',
+                );
+                console.log('[App] Setting workspace access error');
+                if (!cancelled) {
+                  setWorkspaceAccessError(
+                    "You don't have access to this workspace. Please ask the workspace owner to invite you.",
+                  );
+                  console.log('[App] Workspace access error set');
+                }
+                selectedWorkspaceId = data.workspaces[0]?.id ?? null;
+              }
+            } else if (chatRes.status === 403 || chatRes.status === 404) {
+              // User doesn't have access or chat doesn't exist
+              console.warn('[App] Access denied or chat not found');
+              if (!cancelled) {
+                setWorkspaceAccessError(
+                  chatRes.status === 403
+                    ? "You don't have access to this chat. Please ask the workspace owner to invite you."
+                    : "This chat doesn't exist or has been deleted.",
+                );
+              }
+              selectedWorkspaceId = data.workspaces[0]?.id ?? null;
+            } else {
+              console.warn(
+                '[App] Failed to fetch chat details, using first workspace',
+              );
+              selectedWorkspaceId = data.workspaces[0]?.id ?? null;
+            }
+          } catch (error) {
+            console.error('[App] Error fetching chat details:', error);
+            selectedWorkspaceId = data.workspaces[0]?.id ?? null;
+          }
+          }
+        }
+        // Priority 2: If invited to a workspace, use that one
+        else if (invitedWorkspaceId) {
+          const invitedWorkspace = data.workspaces.find(
+            (w: any) => w.id === invitedWorkspaceId,
+          );
+          if (invitedWorkspace) {
+            selectedWorkspaceId = invitedWorkspaceId;
+            console.log(
+              '[App] Switched to invited workspace:',
+              invitedWorkspaceId,
+            );
+
+            // Clean up the URL by removing the query parameter
+            window.history.replaceState({}, '', '/');
+          } else {
+            console.warn(
+              '[App] Invited workspace not found, using first workspace',
+            );
+            selectedWorkspaceId = data.workspaces[0]?.id ?? null;
+          }
+        }
+        // Priority 3: If there's no chat ID in the URL, check localStorage for last visited workspace
+        else if (lastWorkspaceId) {
+          const workspaceExists = data.workspaces.find((w: any) => w.id === lastWorkspaceId);
+
+          if (workspaceExists) {
+            selectedWorkspaceId = lastWorkspaceId;
+          } else {
+            console.warn(
+              '[App] No saved workspace found, using first workspace',
+            );
+          }
+        }
+        // Priority 4: Default to first workspace
+        else {
+          selectedWorkspaceId = data.workspaces[0]?.id ?? null;
+        }
+
         if (!cancelled) {
-          setWorkspaceId(first);
-          console.log('[App] Selected workspace:', first);
+          setWorkspaceId(selectedWorkspaceId);
+          console.log('[App] Selected workspace:', selectedWorkspaceId);
         }
       } catch (error) {
         console.error('[App] Failed to load workspaces:', error);
@@ -530,17 +718,21 @@ export default function App() {
     conversations,
   ]);
 
-  // Get conversations from local storage (only after userId is available)
+  // Get conversations from local storage (only after userId and workspaceId is available)
   useEffect(() => {
     if (!userId) return; // Wait for userId to be set
+    const conversationKey = getConversationsStorageKey();
+    if (!conversationKey) return;
 
     const initializeConversations = async () => {
-      const saved = localStorage.getItem(STORAGE_KEY);
+      const saved = localStorage.getItem(conversationKey);
       const urlParams = new URLSearchParams(window.location.search);
       const urlConversationId = urlParams.get('id');
 
       // Start with initial conversations using user-specific IDs
-      const initialConversations = createInitialConversationsForUser(userId);
+      const initialConversations = createInitialConversationsForWorkspace(
+        workspaceId!,
+      );
       let allConversations = [...initialConversations];
 
       if (saved) {
@@ -559,7 +751,9 @@ export default function App() {
           );
 
           // Create a map of initial conversation IDs for faster lookup
-          const initialIds = new Set([...initialConversations.map((conv) => conv.id)]);
+          const initialIds = new Set([
+            ...initialConversations.map((conv) => conv.id),
+          ]);
 
           // Separate user-created and modified initial conversations
           const userConversations = [];
@@ -611,10 +805,7 @@ export default function App() {
       }
 
       // No URL ID or invalid ID, and not mobile - select first conversation
-      if (allConversations.length > 0) {
-        setActiveConversation(allConversations[0].id);
-      } else {
-        // No conversations at all - automatically start a new chat
+      if (allConversations.length === 0) {
         startNewConversation();
       }
     };
@@ -680,7 +871,7 @@ export default function App() {
               ],
               messages: lastMessagePreview
                 ? [lastMessagePreview, ...(existing?.messages ?? [])]
-                : existing?.messages ?? [],
+                : (existing?.messages ?? []),
               lastMessageTime: chat.lastMessage
                 ? new Date(chat.lastMessage.createdAt).toISOString()
                 : new Date(chat.createdAt).toISOString(),
@@ -690,9 +881,11 @@ export default function App() {
           }
 
           // Ensure profile conversation exists
-          const profileId = getUserSpecificProfileId(userId);
+          const profileId = getWorkspaceSpecificProfileId(workspaceId!);
           if (!byId.has(profileId)) {
-            const [profileConv] = createInitialConversationsForUser(userId);
+            const [profileConv] = createInitialConversationsForWorkspace(
+              workspaceId!,
+            );
             byId.set(profileId, profileConv);
           }
 
@@ -737,7 +930,9 @@ export default function App() {
 
         setConversations((prev) =>
           prev.map((c) =>
-            c.id === activeConversation ? { ...c, messages: data.messages ?? [] } : c,
+            c.id === activeConversation
+              ? { ...c, messages: data.messages ?? [] }
+              : c,
           ),
         );
 
@@ -754,20 +949,127 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeConversation, hasLoadedWorkspaceChats]);
 
-  // Prefer selecting the seeded `setup` channel once workspace chats are loaded
+  // Select chat from URL after workspace chats are loaded (only once)
   useEffect(() => {
-    if (!userId) return;
+    if (!hasLoadedWorkspaceChats) return;
+    if (hasSelectedFromUrl.current) return; // Only do this once
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlChatId = urlParams.get('id');
+
+    if (urlChatId) {
+      // Check if this chat exists in conversations now that workspace chats are loaded
+      const chatExists = conversations.find((c) => c.id === urlChatId);
+      if (chatExists) {
+        console.log(
+          '[App] Selecting chat from URL after workspace chats loaded:',
+          urlChatId,
+        );
+        setActiveConversation(urlChatId);
+        hasSelectedFromUrl.current = true;
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasLoadedWorkspaceChats]);
+
+  // Auto-select Profile chat when switching workspaces or on initial load
+  useEffect(() => {
+    console.log('🚀 Auto-select effect running', {
+      workspaceId,
+      hasLoadedWorkspaceChats,
+      isSwitching: isSwitchingWorkspace.current,
+      activeConversation,
+      conversationsCount: conversations.length
+    });
+
+    if (!workspaceId) return;
     if (!hasLoadedWorkspaceChats) return;
 
-    const profileId = getUserSpecificProfileId(userId);
-    const setup = conversations.find((c) => c.name === 'setup');
+    const profileId = getWorkspaceSpecificProfileId(workspaceId);
+    const profileChat = conversations.find((c) => c.id === profileId);
 
-    if (!setup) return;
+    // If switching workspaces, select Profile chat
+    if (isSwitchingWorkspace.current) {
+      console.log('🔄 WORKSPACE SWITCHING PATH');
+      // 1. Try to get the last active chat ID for this workspace from localStorage
+      const chatIdKey = `supermemoryCurrentChatId-${workspaceId}`;
+      const savedChatId = localStorage.getItem(chatIdKey);
 
-    // Only auto-select on initial load; don't override a deliberate Profile selection.
+      // 2. If we have a saved chat ID, check if that chat exists
+      if (savedChatId) {
+        const savedChat = conversations.find((c) => c.id === savedChatId);
+
+        if (savedChat) {
+          // Chat exists! Restore it
+          console.log(
+            '[App] Restoring last active chat after workspace switch:',
+            savedChatId,
+          );
+          setActiveConversation(savedChatId);
+          window.history.pushState({}, '', `?id=${savedChatId}`);
+          isSwitchingWorkspace.current = false;
+          return;
+        }
+      }
+
+      // 3. Fall back to Profile chat if no saved chat or it doesn't exist
+      if (profileChat) {
+        console.log(
+          '[App] Auto-selecting Profile chat after workspace switch:',
+          profileId,
+        );
+        setActiveConversation(profileId);
+        window.history.pushState({}, '', `?id=${profileId}`);
+        isSwitchingWorkspace.current = false;
+      }
+      return;
+    }
+
+    // Check if there's a chat ID in the URL - if so, don't auto-select
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlChatId = urlParams.get('id');
+    if (urlChatId) return; // Let the URL-based selection handle it
+
+    // Only auto-select on initial load if no conversation is active
     if (!activeConversation) {
-      setActiveConversation(setup.id);
-      window.history.pushState({}, '', `?id=${setup.id}`);
+      console.log('🆕 INITIAL LOAD PATH', {
+        activeConversation,
+        hasWorkspace: !!workspaceId,
+        hasConversations: conversations.length
+      });
+      // Try reading from localStorage first, then setup, then Profile
+      const chatIdKey = getChatIdStorageKey();
+      console.log('🔑 Chat ID key:', chatIdKey);
+      if (chatIdKey) {
+        const savedChatId = localStorage.getItem(chatIdKey);
+        console.log('💾 Saved chat ID from localStorage:', savedChatId);
+        if (savedChatId) {
+          const savedChat = conversations.find((c) => c.id === savedChatId);
+          console.log('✅ Saved chat exists in conversations:', !!savedChat, {
+            savedChatId,
+            totalConversations: conversations.length,
+            conversationIds: conversations.map(c => c.id)
+          });
+          if (savedChat) {
+            console.log('🎯 Selecting saved chat:', savedChatId);
+            setActiveConversation(savedChatId);
+            window.history.pushState({}, '', `?id=${savedChatId}`);
+            return;
+          }
+        }
+      }
+
+      console.log('📋 Falling back to setup or Profile chat');
+      const setup = conversations.find((c) => c.name === 'setup');
+      if (setup) {
+        console.log('🔧 Selecting setup chat');
+        setActiveConversation(setup.id);
+        window.history.pushState({}, '', `?id=${setup.id}`);
+      } else if (profileChat) {
+        console.log('👤 Selecting Profile chat');
+        setActiveConversation(profileId);
+        window.history.pushState({}, '', `?id=${profileId}`);
+      }
     }
   }, [userId, hasLoadedWorkspaceChats, conversations, activeConversation]);
 
@@ -776,6 +1078,15 @@ export default function App() {
     if (activeConversation) {
       setLastActiveConversation(activeConversation);
       resetUnreadCount(activeConversation);
+
+      // Save to workspace-specific localStorage
+      const chatIdKey = getChatIdStorageKey();
+      if (chatIdKey) {
+        localStorage.setItem(chatIdKey, activeConversation);
+        console.log(
+          `[App] Saved active chat "${activeConversation}" to localStorage`
+        );
+      }
     }
   }, [activeConversation]);
 
@@ -942,6 +1253,8 @@ export default function App() {
     const messageText = extractMessageContent(messageHtml);
     if (!messageText.trim() && (!attachments || attachments.length === 0))
       return;
+    const conversationKey = getConversationsStorageKey();
+    if (!conversationKey) return;
 
     // Use the provided conversationId, or fall back to the currently active conversation
     const targetConversationId = conversationId || activeConversation || '';
@@ -979,7 +1292,7 @@ export default function App() {
       const updatedConversations = prev.map((c) =>
         c.id === targetConversationId ? updatedConversation : c,
       );
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedConversations));
+      localStorage.setItem(conversationKey, JSON.stringify(updatedConversations));
       return updatedConversations;
     });
 
@@ -999,15 +1312,205 @@ export default function App() {
     clearMessageDraft(targetConversationId);
   };
 
+  // Method to handle renaming chat
+  const handleRenameConversation = (id: string) => {
+    const conversation = conversations.find((c) => c.id === id);
+    if (conversation) {
+      setRenameChatId(id);
+      setRenameChatName(conversation.name!);
+      setShowRenameChatDialog(true);
+    }
+  };
+
+  const handleConfirmRename = async () => {
+    if (!renameChatName.trim() || !renameChatId) {
+      toast({
+        type: 'error',
+        description: 'Chat name cannot be empty',
+      });
+      return;
+    }
+
+    setRenamingChat(true);
+
+    try {
+      const res = await fetch(`/api/chat/${renameChatId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ title: renameChatName.trim() }),
+      });
+
+      console.log('[App] Rename response status:', res.status);
+
+      if (!res.ok) {
+        const data = await res.json();
+        console.error('[App] Rename failed:', data);
+        toast({
+          type: 'error',
+          description: data.message || 'Failed to rename chat',
+        });
+        setRenamingChat(false);
+        return;
+      }
+
+      const data = await res.json();
+      console.log('[App] Rename successful:', data);
+
+      // Update local state
+      setConversations((prev) =>
+        prev.map((conv) =>
+          conv.id === renameChatId
+            ? { ...conv, name: renameChatName.trim() }
+            : conv,
+        ),
+      );
+
+      // Close dialog first, then show toast
+      setShowRenameChatDialog(false);
+      setRenameChatId(null);
+      setRenameChatName('');
+      setRenamingChat(false);
+
+      // Show success toast after a slight delay to ensure dialog is closed
+      setTimeout(() => {
+        toast({
+          type: 'success',
+          description: 'Chat renamed successfully',
+        });
+      }, 100);
+    } catch (error) {
+      console.error('[App] Rename error:', error);
+      toast({
+        type: 'error',
+        description: 'Failed to rename chat',
+      });
+      setRenamingChat(false);
+    }
+  };
+
+  // Method to handle opening create chat dialog
+  const handleOpenCreateChat = () => {
+    setNewChatName('');
+    setChatNameError('');
+    setShowCreateChatDialog(true);
+  };
+
+  // Method to validate chat name (check for duplicates)
+  const validateChatName = (name: string): boolean => {
+    if (!name.trim()) {
+      setChatNameError('Chat name cannot be empty');
+      return false;
+    }
+
+    // Check if a chat with this name already exists in the workspace
+    const existingChat = conversations.find(
+      (conv) =>
+        conv.name && conv.name.toLowerCase() === name.trim().toLowerCase(),
+    );
+
+    if (existingChat) {
+      setChatNameError('A chat with this name already exists');
+      return false;
+    }
+
+    setChatNameError('');
+    return true;
+  };
+
+  // Method to create a new chat
+  const handleCreateChat = async () => {
+    if (!workspaceId) {
+      toast({
+        type: 'error',
+        description: 'No workspace selected',
+      });
+      return;
+    }
+
+    const trimmedName = newChatName.trim();
+    if (!validateChatName(trimmedName)) {
+      return;
+    }
+
+    setCreatingChat(true);
+
+    try {
+      const res = await fetch(`/api/workspaces/${workspaceId}/chats`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ title: trimmedName }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        toast({
+          type: 'error',
+          description: data.message || 'Failed to create chat',
+        });
+        setCreatingChat(false);
+        return;
+      }
+
+      const data = await res.json();
+
+      // Create a new conversation object for the local state
+      const newConversation: Conversation = {
+        id: data.chat.id,
+        name: data.chat.title,
+        recipients: [
+          {
+            id: 'ai',
+            name: 'Supermemory',
+            bio: 'Workspace AI assistant',
+            title: 'AI',
+          },
+        ],
+        messages: [],
+        lastMessageTime: data.chat.createdAt,
+        unreadCount: 0,
+      };
+
+      // Add to conversations list
+      setConversations((prev) => [newConversation, ...prev]);
+
+      // Close dialog and navigate to new chat
+      setShowCreateChatDialog(false);
+      setNewChatName('');
+      setCreatingChat(false);
+
+      // Navigate to the new chat
+      selectConversation(data.chat.id);
+
+      toast({
+        type: 'success',
+        description: 'Chat created successfully',
+      });
+    } catch (error) {
+      console.error('[App] Create chat error:', error);
+      toast({
+        type: 'error',
+        description: 'Failed to create chat',
+      });
+      setCreatingChat(false);
+    }
+  };
+
   // Method to handle conversation deletion
   const handleDeleteConversation = (id: string) => {
     // Don't allow deleting the Profile conversation
-    if (id === getUserSpecificProfileId(userId || '')) {
+    if (id === getWorkspaceSpecificProfileId(workspaceId || '')) {
       toast({
+        type: 'error',
         description: 'Cannot delete the Profile conversation',
       });
       return;
     }
+    const conversationKey = getConversationsStorageKey();
+    if (!conversationKey) return;
 
     // Clear lastActiveConversation if we're deleting it
     if (id === lastActiveConversation) {
@@ -1020,7 +1523,7 @@ export default function App() {
       );
 
       // Save to localStorage
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(newConversations));
+      localStorage.setItem(conversationKey, JSON.stringify(newConversations));
 
       // If we're deleting the active conversation and there are conversations left
       if (id === activeConversation && newConversations.length > 0) {
@@ -1035,6 +1538,7 @@ export default function App() {
 
     // Show toast notification
     toast({
+      type: 'success',
       description: 'Conversation deleted',
     });
   };
@@ -1044,11 +1548,13 @@ export default function App() {
     conversations: Conversation[],
     updateType?: 'pin' | 'mute',
   ) => {
+    const conversationKey = getConversationsStorageKey();
+    if (!conversationKey) return;
     const updatedConversation = conversations.find(
       (conv) => conv.id === activeConversation,
     );
     setConversations(conversations);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(conversations));
+    localStorage.setItem(conversationKey, JSON.stringify(conversations));
 
     // Show toast notification
     if (updatedConversation) {
@@ -1064,6 +1570,7 @@ export default function App() {
       }
       if (toastMessage) {
         toast({
+          type: 'success',
           description: toastMessage,
         });
       }
@@ -1194,12 +1701,53 @@ export default function App() {
 
   return (
     <div className="flex h-dvh bg-background">
+      {/* Workspace Access Error Banner */}
+      {workspaceAccessError && (
+        <div className="absolute top-0 left-0 right-0 z-50 bg-red-500 text-white px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <svg
+              className="h-5 w-5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+              />
+            </svg>
+            <span>{workspaceAccessError}</span>
+          </div>
+          <button
+            onClick={() => setWorkspaceAccessError(null)}
+            className="text-white hover:text-gray-200"
+            aria-label="Close"
+            type="button"
+          >
+            <svg
+              className="h-5 w-5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </button>
+        </div>
+      )}
       <CommandMenu
         ref={commandMenuRef}
         conversations={conversations}
         activeConversation={activeConversation}
         onNewChat={() => {
-          startNewConversation();
+          handleOpenCreateChat();
           commandMenuRef.current?.setOpen(false);
         }}
         onSelectConversation={selectConversation}
@@ -1209,7 +1757,9 @@ export default function App() {
         soundEnabled={soundEnabled}
         onSoundToggle={handleSoundToggle}
       />
-      <main className="h-dvh w-full bg-background flex flex-col">
+      <main
+        className={`h-dvh w-full bg-background flex flex-col ${workspaceAccessError ? 'pt-12' : ''}`}
+      >
         <div className="flex-1 flex h-full">
           <div
             className={`h-full w-full sm:w-[320px] flex-shrink-0 ${
@@ -1225,6 +1775,7 @@ export default function App() {
                 selectConversation(id);
               }}
               onDeleteConversation={handleDeleteConversation}
+              onRenameConversation={handleRenameConversation}
               onUpdateConversation={handleUpdateConversation}
               isMobileView={isMobileView}
               searchTerm={searchTerm}
@@ -1233,11 +1784,23 @@ export default function App() {
               isCommandMenuOpen={isCommandMenuOpen}
               onScroll={setIsScrolled}
               onSoundToggle={handleSoundToggle}
+              onNewChat={handleOpenCreateChat}
             >
               <Nav
-                onNewChat={startNewConversation}
+                onNewChat={handleOpenCreateChat}
                 isMobileView={isMobileView}
                 isScrolled={isScrolled}
+                currentWorkspaceId={workspaceId}
+                onWorkspaceChange={(newWorkspaceId) => {
+                  console.log('[App] Switching workspace to:', newWorkspaceId);
+                  isSwitchingWorkspace.current = true;
+                  hasSelectedFromUrl.current = false; // Reset URL selection flag
+                  setWorkspaceId(newWorkspaceId);
+                  // Clear conversations when switching workspaces
+                  setConversations([]);
+                  setActiveConversation(null);
+                  setHasLoadedWorkspaceChats(false);
+                }}
               />
             </Sidebar>
           </div>
@@ -1281,7 +1844,8 @@ export default function App() {
               unreadCount={totalUnreadCount}
               isReadOnly={
                 userId
-                  ? activeConversation === getUserSpecificProfileId(userId)
+                  ? activeConversation ===
+                    getWorkspaceSpecificProfileId(workspaceId!)
                   : false
               }
               userId={userId || undefined}
@@ -1290,6 +1854,107 @@ export default function App() {
           </div>
         </div>
       </main>
+
+      {/* Rename Chat Dialog */}
+      <Dialog
+        open={showRenameChatDialog}
+        onOpenChange={setShowRenameChatDialog}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rename Chat</DialogTitle>
+            <DialogDescription>
+              Enter a new name for this chat
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="rename-chat-name">Chat Name</Label>
+              <Input
+                id="rename-chat-name"
+                placeholder="My Chat"
+                value={renameChatName}
+                onChange={(e) => setRenameChatName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleConfirmRename();
+                  }
+                }}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowRenameChatDialog(false);
+                setRenameChatName('');
+                setRenameChatId(null);
+              }}
+              disabled={renamingChat}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleConfirmRename} disabled={renamingChat}>
+              {renamingChat ? 'Renaming...' : 'Rename'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create New Chat Dialog */}
+      <Dialog
+        open={showCreateChatDialog}
+        onOpenChange={setShowCreateChatDialog}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create New Chat</DialogTitle>
+            <DialogDescription>Enter a name for the new chat</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="new-chat-name">Chat Name</Label>
+              <Input
+                id="new-chat-name"
+                placeholder="Chat Name"
+                value={newChatName}
+                onChange={(e) => {
+                  setNewChatName(e.target.value);
+                  // Clear error when user starts typing
+                  if (chatNameError) {
+                    setChatNameError('');
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !creatingChat) {
+                    handleCreateChat();
+                  }
+                }}
+              />
+              {chatNameError && (
+                <p className="text-sm text-red-600">{chatNameError}</p>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowCreateChatDialog(false);
+                setNewChatName('');
+                setChatNameError('');
+              }}
+              disabled={creatingChat}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleCreateChat} disabled={creatingChat}>
+              {creatingChat ? 'Creating...' : 'Create'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
