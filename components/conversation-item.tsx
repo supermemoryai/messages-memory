@@ -1,23 +1,27 @@
-import { useState, useEffect } from "react";
-import { useSwipeable } from "react-swipeable";
-import type { Conversation } from "../types";
-import { SwipeActions } from "./swipe-actions";
+import { useState, useEffect } from 'react';
+import { useSwipeable } from 'react-swipeable';
+import type { Conversation } from '../types';
+import { SwipeActions } from './swipe-actions';
 import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuTrigger,
-} from "./ui/context-menu";
-import { Icons } from "./icons";
-import { useTheme } from "next-themes";
-import { Logo } from "./logo";
+} from './ui/context-menu';
+import { Icons } from './icons';
+import { useTheme } from 'next-themes';
+import { Logo } from './logo';
 
 interface ConversationItemProps {
   conversation: Conversation;
   activeConversation: string | null;
   onSelectConversation: (id: string) => void;
   onDeleteConversation: (id: string) => void;
-  onUpdateConversation: (conversations: Conversation[], updateType?: 'pin' | 'mute') => void;
+  onRenameConversation: (id: string) => void;
+  onUpdateConversation: (
+    conversations: Conversation[],
+    updateType?: 'pin' | 'mute',
+  ) => void;
   conversations: Conversation[];
   formatTime: (timestamp: string | undefined) => string;
   getInitials: (name: string) => string;
@@ -32,6 +36,7 @@ export function ConversationItem({
   activeConversation,
   onSelectConversation,
   onDeleteConversation,
+  onRenameConversation,
   onUpdateConversation,
   conversations,
   formatTime,
@@ -44,7 +49,7 @@ export function ConversationItem({
   const [isSwiping, setIsSwiping] = useState(false);
   const isSwipeOpen = openSwipedConvo === conversation.id;
   const { theme, systemTheme } = useTheme();
-  const effectiveTheme = theme === "system" ? systemTheme : theme;
+  const effectiveTheme = theme === 'system' ? systemTheme : theme;
 
   useEffect(() => {
     const preventDefault = (e: TouchEvent) => {
@@ -61,8 +66,8 @@ export function ConversationItem({
       }
     };
 
-    document.addEventListener("touchmove", preventDefault, { passive: false });
-    return () => document.removeEventListener("touchmove", preventDefault);
+    document.addEventListener('touchmove', preventDefault, { passive: false });
+    return () => document.removeEventListener('touchmove', preventDefault);
   }, [isSwiping]);
 
   const handlers = useSwipeable({
@@ -82,7 +87,7 @@ export function ConversationItem({
   const handleSwipePin = () => {
     if (!isSwipeOpen) return;
     const updatedConversations = conversations.map((conv) =>
-      conv.id === conversation.id ? { ...conv, pinned: !conv.pinned } : conv
+      conv.id === conversation.id ? { ...conv, pinned: !conv.pinned } : conv,
     );
     onUpdateConversation(updatedConversations, 'pin');
     setOpenSwipedConvo(null);
@@ -102,7 +107,7 @@ export function ConversationItem({
 
   const handleContextMenuPin = () => {
     const updatedConversations = conversations.map((conv) =>
-      conv.id === conversation.id ? { ...conv, pinned: !conv.pinned } : conv
+      conv.id === conversation.id ? { ...conv, pinned: !conv.pinned } : conv,
     );
     onUpdateConversation(updatedConversations, 'pin');
   };
@@ -115,9 +120,13 @@ export function ConversationItem({
     const updatedConversations = conversations.map((conv) =>
       conv.id === conversation.id
         ? { ...conv, hideAlerts: !conv.hideAlerts }
-        : conv
+        : conv,
     );
     onUpdateConversation(updatedConversations, 'mute');
+  };
+
+  const handleContextMenuRename = () => {
+    onRenameConversation(conversation.id);
   };
 
   const ConversationContent = (
@@ -125,17 +134,18 @@ export function ConversationItem({
       onClick={() => onSelectConversation(conversation.id)}
       aria-label={`Conversation with ${conversation.recipients
         .map((r) => r.name)
-        .join(", ")}`}
-      aria-current={activeConversation === conversation.id ? "true" : undefined}
+        .join(', ')}`}
+      aria-current={activeConversation === conversation.id ? 'true' : undefined}
       className={`w-full h-[70px] py-2 text-left relative flex items-center ${
         activeConversation === conversation.id
-          ? "bg-[#0A7CFF] text-white rounded-md"
-          : ""
+          ? 'bg-[#0A7CFF] text-white rounded-md'
+          : ''
       } ${
         showDivider
           ? 'after:content-[""] after:absolute after:bottom-0 after:left-[56px] after:right-4 after:border-t after:border-muted-foreground/20'
-          : ""
+          : ''
       }`}
+      type="button"
     >
       {conversation.unreadCount > 0 && (
         <div className="absolute left-0.5 w-2.5 h-2.5 bg-[#0A7CFF] rounded-full flex-shrink-0" />
@@ -157,14 +167,15 @@ export function ConversationItem({
         <div className="flex-1 min-w-0 py-2">
           <div className="flex justify-between items-baseline">
             <span className="text-sm font-medium line-clamp-1 max-w-[70%]">
-              {conversation.name || conversation.recipients.map((r) => r.name).join(", ")}
+              {conversation.name ||
+                conversation.recipients.map((r) => r.name).join(', ')}
             </span>
             {conversation.lastMessageTime && (
               <span
                 className={`text-xs ml-2 flex-shrink-0 ${
                   activeConversation === conversation.id
-                    ? "text-white/80"
-                    : "text-muted-foreground"
+                    ? 'text-white/80'
+                    : 'text-muted-foreground'
                 }`}
               >
                 {formatTime(conversation.lastMessageTime)}
@@ -174,8 +185,8 @@ export function ConversationItem({
           <div
             className={`text-xs h-8 flex items-start justify-between ${
               activeConversation === conversation.id
-                ? "text-white/80"
-                : "text-muted-foreground"
+                ? 'text-white/80'
+                : 'text-muted-foreground'
             }`}
           >
             {conversation.isTyping ? (
@@ -184,37 +195,37 @@ export function ConversationItem({
                   <img
                     src={
                       activeConversation === conversation.id
-                        ? "/messages/typing-bubbles/typing-blue.svg"
-                        : effectiveTheme === "dark"
-                        ? "/messages/typing-bubbles/typing-dark.svg"
-                        : "/messages/typing-bubbles/typing-light.svg"
+                        ? '/messages/typing-bubbles/typing-blue.svg'
+                        : effectiveTheme === 'dark'
+                          ? '/messages/typing-bubbles/typing-dark.svg'
+                          : '/messages/typing-bubbles/typing-light.svg'
                     }
                     alt="typing"
                     className="w-[45px] h-auto"
                   />
                   <div className="absolute top-[40%] left-[35%] flex gap-[2px]">
                     <div
-                      style={{ animation: "blink 1.4s infinite linear" }}
+                      style={{ animation: 'blink 1.4s infinite linear' }}
                       className={`w-1 h-1 ${
                         activeConversation === conversation.id
-                          ? "bg-blue-100"
-                          : "bg-gray-500 dark:bg-gray-300"
+                          ? 'bg-blue-100'
+                          : 'bg-gray-500 dark:bg-gray-300'
                       } rounded-full`}
                     />
                     <div
-                      style={{ animation: "blink 1.4s infinite linear 0.2s" }}
+                      style={{ animation: 'blink 1.4s infinite linear 0.2s' }}
                       className={`w-1 h-1 ${
                         activeConversation === conversation.id
-                          ? "bg-blue-100"
-                          : "bg-gray-500 dark:bg-gray-300"
+                          ? 'bg-blue-100'
+                          : 'bg-gray-500 dark:bg-gray-300'
                       } rounded-full`}
                     />
                     <div
-                      style={{ animation: "blink 1.4s infinite linear 0.4s" }}
+                      style={{ animation: 'blink 1.4s infinite linear 0.4s' }}
                       className={`w-1 h-1 ${
                         activeConversation === conversation.id
-                          ? "bg-blue-100"
-                          : "bg-gray-500 dark:bg-gray-300"
+                          ? 'bg-blue-100'
+                          : 'bg-gray-500 dark:bg-gray-300'
                       } rounded-full`}
                     />
                   </div>
@@ -225,26 +236,26 @@ export function ConversationItem({
                 <div className="line-clamp-2 flex-1">
                   {(() => {
                     const lastMessage = conversation.messages
-                      .filter((message) => message.sender !== "system")
+                      .filter((message) => message.sender !== 'system')
                       .slice(-1)[0];
 
-                    if (!lastMessage) return "";
+                    if (!lastMessage) return '';
 
                     const lastReaction = lastMessage.reactions?.[0];
                     if (lastReaction) {
                       const reactionText = {
-                        heart: "loved",
-                        like: "liked",
-                        dislike: "disliked",
-                        laugh: "laughed at",
-                        emphasize: "emphasized",
-                        question: "questioned",
+                        heart: 'loved',
+                        like: 'liked',
+                        dislike: 'disliked',
+                        laugh: 'laughed at',
+                        emphasize: 'emphasized',
+                        question: 'questioned',
                       }[lastReaction.type];
 
-                      return lastReaction.sender === "me"
+                      return lastReaction.sender === 'me'
                         ? `You ${reactionText} "${lastMessage.content}"`
                         : `${
-                            lastReaction.sender.split(" ")[0]
+                            lastReaction.sender.split(' ')[0]
                           } ${reactionText} "${lastMessage.content}"`;
                     }
 
@@ -254,10 +265,10 @@ export function ConversationItem({
                 {conversation.hideAlerts && (
                   <Icons.bellOff
                     className={`flex-shrink-0 h-3 w-3 ${
-                      activeConversation === conversation.id 
-                        ? "text-white/80" 
-                        : "text-muted-foreground"
-                    }`} 
+                      activeConversation === conversation.id
+                        ? 'text-white/80'
+                        : 'text-muted-foreground'
+                    }`}
                   />
                 )}
               </div>
@@ -275,7 +286,7 @@ export function ConversationItem({
           <div {...handlers} className="relative overflow-hidden">
             <div
               className={`transition-transform duration-300 ease-out w-full ${
-                isSwipeOpen ? "transform -translate-x-24" : ""
+                isSwipeOpen ? 'transform -translate-x-24' : ''
               }`}
             >
               {ConversationContent}
@@ -294,29 +305,41 @@ export function ConversationItem({
         <ContextMenuContent>
           <ContextMenuItem
             className={`focus:bg-[#0A7CFF] focus:text-white ${
-              isMobileView ? "flex items-center justify-between" : ""
+              isMobileView ? 'flex items-center justify-between' : ''
             }`}
             onClick={handleContextMenuPin}
           >
-            <span>{conversation.pinned ? "Unpin" : "Pin"}</span>
+            <span>{conversation.pinned ? 'Unpin' : 'Pin'}</span>
             {isMobileView && <Icons.pin className="h-4 w-4 ml-2" />}
           </ContextMenuItem>
           <ContextMenuItem
             className={`focus:bg-[#0A7CFF] focus:text-white ${
-              isMobileView ? "flex items-center justify-between" : ""
+              isMobileView ? 'flex items-center justify-between' : ''
             }`}
             onClick={handleContextMenuHideAlerts}
           >
-            <span>{conversation.hideAlerts ? "Show Alerts" : "Hide Alerts"}</span>
-            {isMobileView && (
-              conversation.hideAlerts ? 
-                <Icons.bell className="h-4 w-4 ml-2" /> :
+            <span>
+              {conversation.hideAlerts ? 'Show Alerts' : 'Hide Alerts'}
+            </span>
+            {isMobileView &&
+              (conversation.hideAlerts ? (
+                <Icons.bell className="h-4 w-4 ml-2" />
+              ) : (
                 <Icons.bellOff className="h-4 w-4 ml-2" />
-            )}
+              ))}
           </ContextMenuItem>
           <ContextMenuItem
             className={`focus:bg-[#0A7CFF] focus:text-white ${
-              isMobileView ? "flex items-center justify-between" : ""
+              isMobileView ? 'flex items-center justify-between' : ''
+            }`}
+            onClick={handleContextMenuRename}
+          >
+            <span>Rename</span>
+            {isMobileView && <Icons.edit className="h-4 w-4 ml-2" />}
+          </ContextMenuItem>
+          <ContextMenuItem
+            className={`focus:bg-[#0A7CFF] focus:text-white ${
+              isMobileView ? 'flex items-center justify-between' : ''
             } text-red-600`}
             onClick={handleContextMenuDelete}
           >
@@ -337,13 +360,21 @@ export function ConversationItem({
             className={`focus:bg-[#0A7CFF] focus:text-white focus:rounded-md`}
             onClick={handleContextMenuPin}
           >
-            <span>{conversation.pinned ? "Unpin" : "Pin"}</span>
+            <span>{conversation.pinned ? 'Unpin' : 'Pin'}</span>
           </ContextMenuItem>
           <ContextMenuItem
             className={`focus:bg-[#0A7CFF] focus:text-white focus:rounded-md`}
             onClick={handleContextMenuHideAlerts}
           >
-            <span>{conversation.hideAlerts ? "Show Alerts" : "Hide Alerts"}</span>
+            <span>
+              {conversation.hideAlerts ? 'Show Alerts' : 'Hide Alerts'}
+            </span>
+          </ContextMenuItem>
+          <ContextMenuItem
+            className={`focus:bg-[#0A7CFF] focus:text-white focus:rounded-md`}
+            onClick={handleContextMenuRename}
+          >
+            <span>Rename</span>
           </ContextMenuItem>
           <ContextMenuItem
             className={`focus:bg-[#0A7CFF] focus:text-white focus:rounded-md text-red-600`}
@@ -356,4 +387,3 @@ export function ConversationItem({
     );
   }
 }
-

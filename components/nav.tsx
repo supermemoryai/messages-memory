@@ -8,9 +8,11 @@ interface NavProps {
   onNewChat: () => void;
   isMobileView: boolean;
   isScrolled?: boolean;
+  currentWorkspaceId: string | null;
+  onWorkspaceChange: (workspaceId: string) => void;
 }
 
-export function Nav({ onNewChat, isMobileView, isScrolled }: NavProps) {
+export function Nav({ onNewChat, isMobileView, isScrolled, currentWorkspaceId, onWorkspaceChange }: NavProps) {
   // Keyboard shortcut for creating a new chat
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -43,7 +45,7 @@ export function Nav({ onNewChat, isMobileView, isScrolled }: NavProps) {
           isMobileView ? 'bg-background' : 'bg-muted',
         )}
       >
-        <div className="flex items-center gap-1.5 p-2">
+        {/* <div className="flex items-center gap-1.5 p-2">
           <button
             type="button"
             onClick={() => window.close()}
@@ -67,6 +69,12 @@ export function Nav({ onNewChat, isMobileView, isScrolled }: NavProps) {
               <span className="text-background">+</span>
             </span>
           </button>
+        </div> */}
+        <div className="flex-1 px-2">
+          <WorkspaceSwitcher
+            currentWorkspaceId={currentWorkspaceId}
+            onWorkspaceChange={onWorkspaceChange}
+          />
         </div>
         <div className="flex items-center gap-1">
           <InviteButton />
