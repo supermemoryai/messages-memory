@@ -313,6 +313,31 @@ export async function getChatsByWorkspaceId({
   }
 }
 
+export async function getChatByWorkspaceAndTitle({
+  workspaceId,
+  title,
+} : {
+  workspaceId: string;
+  title: string;
+}) {
+  try {
+    const [existingChat] = await db
+      .select()
+      .from(chat)
+      .where(and(
+        eq(chat.workspaceId, workspaceId), 
+        eq(chat.title, title)
+      ))
+      .limit(1);
+    return existingChat;
+  } catch (error) {
+    throw new ChatSDKError(
+      'bad_request:database',
+      'Failed to check chat title',
+    )
+  }
+}
+
 export async function getChatById({ id }: { id: string }) {
   try {
     const [selectedChat] = await db.select().from(chat).where(eq(chat.id, id));
@@ -600,6 +625,28 @@ export async function updateChatVisiblityById({
   }
 }
 
+export async function updateChatTitleById({
+  chatId,
+  title,
+}: {
+  chatId: string;
+  title: string;
+}) {
+  try {
+    const [updated] = await db
+      .update(chat)
+      .set({ title })
+      .where(eq(chat.id, chatId))
+      .returning();
+    return updated;
+  } catch (error) {
+    throw new ChatSDKError(
+      'bad_request:database',
+      'Failed to update chat title by id',
+    );
+  }
+}
+
 export async function getMessageCountByUserId({
   id,
   differenceInHours,
@@ -851,6 +898,28 @@ export async function deleteWorkspace({ id }: { id: string }) {
   }
 }
 
+export async function updateWorkspaceTitleById({
+  workspaceId,
+  name,
+}: {
+  workspaceId: string;
+  name: string;
+}) {
+  try {
+    const [updated] = await db
+      .update(workspace)
+      .set({ name })
+      .where(eq(workspace.id, workspaceId))
+      .returning();
+    return updated;
+  } catch (error) {
+    throw new ChatSDKError(
+      'bad_request:database',
+      'Failed to update workspace title by id',
+    );
+  }
+}
+
 // WorkspaceMember queries
 export async function getWorkspaceMember({
   workspaceId,
@@ -1013,5 +1082,50 @@ export async function deleteInvitation({ id }: { id: string }) {
     return deleted;
   } catch (error) {
     throw new ChatSDKError('bad_request:database', 'Failed to delete invitation');
+  }
+}
+
+export async function getInvitationsByWorkspaceId({
+  workspaceId,
+}: {
+  workspaceId: string;
+}) {
+  try {
+    const invitations = await db
+      .select({
+        id: invitation.id,
+        workspaceId: invitation.workspaceId,
+        token: invitation.token,
+        createdBy: invitation.createdBy,
+        createdAt: invitation.createdAt,
+      })
+      .from(invitation)
+      .where(eq(invitation.workspaceId, workspaceId))
+      .orderBy(desc(invitation.createdAt));
+    return invitations;
+  } catch (error) {
+    throw new ChatSDKError(
+      'bad_request:database',
+      'Failed to get invitations by workspace ID',
+    );
+  }
+}
+
+export async function deleteInvitationsByWorkspaceId({
+  workspaceId,
+}: {
+  workspaceId: string;
+}) {
+  try {
+    const deleted = await db
+      .delete(invitation)
+      .where(eq(invitation.workspaceId, workspaceId))
+      .returning();
+    return deleted;
+  } catch (error) {
+    throw new ChatSDKError(
+      'bad_request:database',
+      'Failed to delete invitations by workspace ID',
+    );
   }
 }
