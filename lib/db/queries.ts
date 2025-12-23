@@ -383,9 +383,9 @@ export async function getChatConnectionsByChatId({ chatId }: { chatId: string })
   }
 }
 
-export async function deleteChatConnection({ id }: { id: string }) {
+export async function deleteChatConnection({ connectionId }: { connectionId: string }) {
   try {
-    return await db.delete(chatConnection).where(eq(chatConnection.id, id)).returning();
+    return await db.delete(chatConnection).where(eq(chatConnection.supermemoryConnectionId, connectionId)).returning();
   } catch (error) {
     throw new ChatSDKError('bad_request:database', 'Failed to delete chat connection');
   }
