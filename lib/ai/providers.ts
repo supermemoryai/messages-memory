@@ -22,7 +22,7 @@ const supermemory = (user?: string) => {
 
   return createAnthropic({
     apiKey: process.env.ANTHROPIC_API_KEY,
-  }).languageModel('claude-3-7-sonnet-latest');
+  }).languageModel('claude-haiku-4-5-20251001');
 };
 
 export const myProvider = isTestEnvironment
