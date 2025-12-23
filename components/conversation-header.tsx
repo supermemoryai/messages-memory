@@ -3,14 +3,20 @@ import type { Conversation } from "../types";
 import { Logo } from "./logo";
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { createInitialContactsForUser } from "../data/initial-contacts";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/components/toast";
 import { cn, } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { getUserContacts, addUserContact } from "@/lib/contacts";
 import { ContactDrawer } from "./contact-drawer";
-import { RotateCcw, Trash2, MessageSquarePlus, Network } from "lucide-react";
+import { Trash2, Network, Link2, Loader2, RefreshCw, Trash } from "lucide-react";
 import { signOut, signIn } from "next-auth/react";
 import { MemoryGraphDialog } from "./memory-graph-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 // Helper to check if we can add more recipients
 const hasReachedMaxRecipients = (recipients: string) => {
@@ -89,6 +95,7 @@ function RecipientPill({
       <span className="inline-flex items-center px-2 py-1 rounded-lg text-base sm:text-sm bg-blue-100/50 dark:bg-[#15406B]/50 text-gray-900 dark:text-gray-100">
         {trimmedRecipient}
         <button
+          type="button"
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -255,9 +262,11 @@ function MobileAvatars({
 
   return (
     <>
-      {recipients.slice(0, 4).map((recipient, index) => (
+      {recipients.slice(0, 4).map((recipient, index) => {
+        const key = recipient.name || `recipient-${index}`;
+        return (
         <div
-          key={index}
+          key={key}
           className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0"
           style={getOffset(index, recipients.length)}
         >
@@ -273,7 +282,7 @@ function MobileAvatars({
             </div>
           )}
         </div>
-      ))}
+      )})}
     </>
   );
 }
@@ -297,13 +306,32 @@ export function ConversationHeader({
   onClearChat,
   userId,
 }: ConversationHeaderProps) {
-  const { toast } = useToast();
   const [searchValue, setSearchValue] = useState("");
   const [showResults, setShowResults] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const [isEditMode, setIsEditMode] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
   const [showMemoryGraph, setShowMemoryGraph] = useState(false);
+  const [connecting, setConnecting] = useState(false);
+  const [deletingConnectionId, setDeletingConnectionId] = useState<string | null>(null);
+  const [connections, setConnections] = useState<
+    Array<{
+      id?: string;
+      connectionId?: string;
+      provider?: string;
+      email?: string;
+      documentLimit?: number;
+      expiresAt?: string;
+      createdAt?: string;
+      updatedAt?: string;
+    }>
+  >([]);
+  const [loadingConnections, setLoadingConnections] = useState(false);
+  const [openConnectMenu, setOpenConnectMenu] = useState(false);
+  const chatId = activeConversation?.id || '';
+  const [documentLimit, setDocumentLimit] = useState(5000);
+  const [syncingConnectionId, setSyncingConnectionId] = useState<string | null>(null);
+  const [connectedToastShown, setConnectedToastShown] = useState(false);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -359,6 +387,7 @@ export function ConversationHeader({
           } else {
             // Show error toast if trying to save invalid state
             toast({ 
+              type: 'error',
               description: currentRecipients.length === 0 
                 ? "You need at least one recipient" 
                 : "You can add up to four recipients"
@@ -417,12 +446,12 @@ export function ConversationHeader({
       const recipientNames = recipientInput.split(",").filter((r) => r.trim());
 
       if (isEditMode && recipientNames.length === 0) {
-        toast({ description: "You need at least one recipient" });
+        toast({ type: 'error', description: "You need at least one recipient" });
         return;
       }
 
       if (isNewChat && !isMobileView && recipientNames.length === 0) {
-        toast({ description: "Please add at least one recipient" });
+        toast({ type: 'error', description: "Please add at least one recipient" });
         return;
       }
 
@@ -460,13 +489,11 @@ export function ConversationHeader({
       return;
     }
 
-    // Desktop: clicking header in compact mode enters edit mode
-    if (!isNewChat && !isEditMode && !isMobileView) {
-      setIsEditMode(true);
-      const recipients =
-        activeConversation?.recipients.map((r) => r.name).join(",") || "";
-      setRecipientInput(`${recipients},`);
-    } 
+    // For existing chats, do nothing on header click (keep compact view)
+    if (!isNewChat) {
+      return;
+    }
+
     // Desktop: clicking header in new chat compact mode enters edit mode
     else if (isNewChat && showCompactNewChat && !isMobileView) {
       setShowCompactNewChat?.(false);
@@ -489,7 +516,7 @@ export function ConversationHeader({
     if (currentRecipients.includes(person.name)) return;
 
     if (hasReachedMaxRecipients(recipientInput)) {
-      toast({ description: "You can add up to four recipients" });
+      toast({ type: 'error', description: "You can add up to four recipients" });
       return;
     }
 
@@ -524,6 +551,7 @@ export function ConversationHeader({
 
         if (data.validation === false) {
           toast({
+            type: 'error',
             description: "Please enter a valid contact name",
           });
           return;
@@ -536,6 +564,7 @@ export function ConversationHeader({
         setShowResults(true); // Keep the dropdown open for more selections
       } catch {
         toast({
+          type: 'error',
           description: "Failed to validate contact name",
         });
       } finally {
@@ -611,6 +640,7 @@ export function ConversationHeader({
         }
 
         toast({
+          type: 'success',
           description: 'Chat cleared! Starting fresh conversation.',
         });
       } else {
@@ -618,6 +648,7 @@ export function ConversationHeader({
       }
     } catch (error) {
       toast({
+        type: 'error',
         description: 'Failed to clear chat',
       });
     }
@@ -643,6 +674,7 @@ export function ConversationHeader({
         }
 
         toast({
+          type: 'success',
           description: 'New conversation started! Memories retained.',
         });
       } else {
@@ -650,10 +682,136 @@ export function ConversationHeader({
       }
     } catch (error) {
       toast({
+        type: 'error',
         description: 'Failed to start new conversation',
       });
     }
   };
+
+  const fetchConnections = useCallback(async () => {
+    if (!chatId) return;
+    setLoadingConnections(true);
+    try {
+      const res = await fetch(`/api/supermemory/connections?chatId=${chatId}`);
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        toast({ type: 'error', description: data.message || 'Failed to load connections' });
+        return;
+      }
+      const data = await res.json();
+      setConnections(data.connections || []);
+    } catch (error) {
+      toast({ type: 'error', description: 'Failed to load connections' });
+    } finally {
+      setLoadingConnections(false);
+    }
+  }, [chatId, toast]);
+
+  const handleOpenChange = useCallback(
+    (nextOpen: boolean) => {
+      setOpenConnectMenu(nextOpen);
+      if (nextOpen) {
+        fetchConnections();
+      }
+    },
+    [fetchConnections],
+  );
+
+  const handleDeleteConnection = useCallback(
+    async (connectionId: string) => {
+      if (!chatId) return;
+      setDeletingConnectionId(connectionId);
+      try {
+        const res = await fetch(
+          `/api/supermemory/connections?connectionId=${connectionId}&chatId=${chatId}`,
+          { method: 'DELETE' },
+        );
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          toast({ type: 'error', description: data.message || 'Failed to delete connection' });
+          return;
+        }
+        await fetchConnections();
+      } catch (error) {
+        toast({ type: 'error', description: 'Failed to delete connection' });
+      } finally {
+        setDeletingConnectionId(null);
+      }
+    },
+    [chatId, fetchConnections, toast],
+  );
+
+  const handleSyncConnection = useCallback(
+    async (connectionId: string, provider?: string) => {
+      if (!chatId || !provider) return;
+      setSyncingConnectionId(connectionId);
+      try {
+        const res = await fetch('/api/supermemory/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ chatId, provider }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          toast({ type: 'error', description: data.message || 'Failed to sync connection' });
+          return;
+        }
+        toast({ type: 'success', description: 'Sync requested' });
+      } catch (error) {
+        toast({ type: 'error', description: 'Failed to sync connection' });
+      } finally {
+        setSyncingConnectionId(null);
+      }
+    },
+    [chatId, toast],
+  );
+
+  const handleConnect = useCallback(
+    async (provider: 'google-drive' | 'notion' | 'onedrive' | 'web-crawler' | 'github') => {
+      if (!chatId) return;
+      const limit = Number.isFinite(documentLimit) && documentLimit > 0 ? documentLimit : 5000;
+      setConnecting(true);
+      try {
+        const res = await fetch('/api/supermemory/connect', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            provider,
+            chatId,
+            documentLimit: limit,
+          }),
+        });
+
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          toast({
+            type: 'error',
+            description: data.message || 'Failed to start connection',
+          });
+          return;
+        }
+
+        const data = await res.json();
+        if (data.authLink) {
+          window.location.href = data.authLink;
+          return;
+        }
+
+        toast({
+          type: 'error',
+          description: 'No auth link returned from Supermemory',
+        });
+      } catch (error) {
+        toast({
+          type: 'error',
+          description: 'Failed to start connection',
+        });
+      } finally {
+        setConnecting(false);
+      }
+    },
+    [chatId, documentLimit, toast],
+  );
 
   const handleDeleteAll = async () => {
     if (!activeConversation) return;
@@ -673,6 +831,7 @@ export function ConversationHeader({
         }
 
         toast({
+          type: 'success',
           description: 'All memories deleted! Signing in as new user...',
         });
 
@@ -690,6 +849,7 @@ export function ConversationHeader({
       }
     } catch (error) {
       toast({
+        type: 'error',
         description: 'Failed to delete all data',
       });
     }
@@ -710,21 +870,37 @@ export function ConversationHeader({
     }
   }, [isEditMode, activeConversation]);
 
+  useEffect(() => {
+    if (connectedToastShown) return;
+    if (typeof window === 'undefined') return;
+    const url = new URL(window.location.href);
+    const connected = url.searchParams.get('connected');
+    if (connected === 'true') {
+      toast({ type: 'success', description: 'Connection added' });
+      url.searchParams.delete('connected');
+      window.history.replaceState({}, '', url.toString());
+      setConnectedToastShown(true);
+    }
+  }, [connectedToastShown, toast]);
+
   // Render helpers
   const renderRecipients = () => {
     const recipients = recipientInput.split(",");
     const completeRecipients = recipients.slice(0, -1);
     const totalRecipients = completeRecipients.filter(r => r.trim()).length;
 
-    return completeRecipients.map((recipient, index) => (
+    return completeRecipients.map((recipient, index) => {
+      const key = recipient.trim() || `recipient-${index}`;
+      return (
       <RecipientPill
-        key={`${recipient}-${index}`}
+        key={key}
         recipient={recipient}
         index={index}
         onRemove={(index) => {
           // Prevent removing if it's the last recipient
           if (totalRecipients <= 1) {
             toast({ 
+              type: 'error',
               description: "You must have at least one recipient" 
             });
             return;
@@ -746,7 +922,7 @@ export function ConversationHeader({
         }}
         isMobileView={isMobileView}
       />
-    ));
+    )});
   };
 
   return (
@@ -762,6 +938,7 @@ export function ConversationHeader({
           <div className="flex items-center gap-2 flex-1">
             <div className="absolute left-2 top-8 w-12">
               <button
+                type="button"
                 onClick={(e) => {
                   e.stopPropagation();
                   if (isNewChat) {
@@ -874,18 +1051,129 @@ export function ConversationHeader({
           {/* Mobile Action Buttons - only show for Supermemory chat */}
           {!isNewChat && activeConversation && activeConversation.recipients.some(r => r.name === 'Supermemory') && (
             <div className="absolute right-4 top-8 flex gap-1">
+              <DropdownMenu open={openConnectMenu} onOpenChange={handleOpenChange}>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={(e) => e.stopPropagation()}
+                    className="p-2 hover:bg-accent rounded-full transition-colors"
+                    aria-label="Connect data source"
+                    title="Connect data source"
+                    disabled={connecting}
+                  >
+                    {connecting ? <Loader2 className="h-5 w-5 animate-spin" /> : <Link2 className="h-5 w-5" />}
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-72 max-h-[26rem] overflow-hidden">
+                  <div className="px-3 py-1 text-xs text-muted-foreground">Add connection</div>
+                  <DropdownMenuItem onClick={() => handleConnect('notion')}>
+                    Connect Notion
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleConnect('onedrive')}>
+                    Connect OneDrive
+                  </DropdownMenuItem>
+                  <div className="px-3 pt-2 pb-1 text-xs text-muted-foreground">Document limit</div>
+                  <div className="px-3 pb-2">
+                    <input
+                      type="number"
+                      min={1}
+                      value={documentLimit}
+                      onChange={(e) => setDocumentLimit(Number.parseInt(e.target.value || '0'))}
+                      className="w-full rounded-md border border-input bg-background px-2 py-1 text-sm"
+                    />
+                  </div>
+                  <div className="px-3 pt-2 pb-1 text-xs text-muted-foreground flex items-center justify-between">
+                    <span>Connections</span>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        fetchConnections();
+                      }}
+                      className="inline-flex items-center gap-1 text-xs text-foreground hover:underline"
+                    >
+                      <RefreshCw className="h-3 w-3" /> Refresh
+                    </button>
+                  </div>
+                  <ScrollArea className="max-h-80 overflow-y-auto">
+                    {loadingConnections ? (
+                      <div className="px-3 py-2 text-sm text-muted-foreground flex items-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Loading...
+                      </div>
+                    ) : connections.length === 0 ? (
+                      <div className="px-3 py-2 text-sm text-muted-foreground">No connections yet</div>
+                    ) : (
+                      connections.map((conn) => {
+                        const key = conn.connectionId || conn.id || crypto.randomUUID();
+                        return (
+                          <div
+                            key={key}
+                            className="px-3 py-2 text-sm flex items-center justify-between gap-2"
+                          >
+                            <div className="flex flex-col">
+                              <span className="font-medium">{conn.provider || 'Unknown provider'}</span>
+                              <span className="text-xs text-muted-foreground">
+                                {conn.email || 'Unknown user'}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  const targetId = conn.connectionId || conn.id;
+                                  if (targetId && conn.provider) {
+                                    handleSyncConnection(targetId, conn.provider);
+                                  }
+                                }}
+                                className="p-1 rounded hover:bg-accent text-foreground inline-flex items-center gap-1"
+                                aria-label="Sync connection"
+                                title="Sync connection"
+                                disabled={syncingConnectionId === (conn.connectionId || conn.id)}
+                              >
+                                {syncingConnectionId === (conn.connectionId || conn.id) ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <>
+                                    <RefreshCw className="h-4 w-4" />
+                                    <span className="text-xs">Sync</span>
+                                  </>
+                                )}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  const targetId = conn.connectionId || conn.id;
+                                  if (targetId) {
+                                    handleDeleteConnection(targetId);
+                                  }
+                                }}
+                                className="p-1 rounded hover:bg-red-100 dark:hover:bg-red-900/30 text-red-600 dark:text-red-400"
+                                aria-label="Delete connection"
+                                title="Delete connection"
+                                disabled={deletingConnectionId === (conn.connectionId || conn.id)}
+                              >
+                                {deletingConnectionId === (conn.connectionId || conn.id) ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Trash className="h-4 w-4" />
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </ScrollArea>
+                </DropdownMenuContent>
+              </DropdownMenu>
               <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleNewConversation();
-                }}
-                className="p-2 hover:bg-accent rounded-full transition-colors"
-                aria-label="New conversation (keep memories)"
-                title="Start new conversation (keep memories)"
-              >
-                <MessageSquarePlus className="h-5 w-5" />
-              </button>
-              <button
+                type="button"
                 onClick={(e) => {
                   e.stopPropagation();
                   handleDeleteAll();
@@ -903,6 +1191,7 @@ export function ConversationHeader({
           {!isNewChat && activeConversation && activeConversation.recipients.some(r => r.name === 'Profile') && (
             <div className="absolute right-4 top-8 flex gap-1">
               <button
+                type="button"
                 onClick={(e) => {
                   e.stopPropagation();
                   setShowMemoryGraph(true);
@@ -984,18 +1273,129 @@ export function ConversationHeader({
           {/* Desktop Action Buttons - only show for Supermemory chat */}
           {!isNewChat && activeConversation && activeConversation.recipients.some(r => r.name === 'Supermemory') && (
             <div className="ml-auto flex gap-1">
+              <DropdownMenu open={openConnectMenu} onOpenChange={handleOpenChange}>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={(e) => e.stopPropagation()}
+                    className="p-2 hover:bg-accent rounded-full transition-colors"
+                    aria-label="Connect data source"
+                    title="Connect data source"
+                    disabled={connecting}
+                  >
+                    {connecting ? <Loader2 className="h-5 w-5 animate-spin" /> : <Link2 className="h-5 w-5" />}
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-72 max-h-[26rem] overflow-hidden">
+                  <div className="px-3 py-1 text-xs text-muted-foreground">Add connection</div>
+                  <DropdownMenuItem onClick={() => handleConnect('notion')}>
+                    Connect Notion
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleConnect('onedrive')}>
+                    Connect OneDrive
+                  </DropdownMenuItem>
+                  <div className="px-3 pt-2 pb-1 text-xs text-muted-foreground">Document limit</div>
+                  <div className="px-3 pb-2">
+                    <input
+                      type="number"
+                      min={1}
+                      value={documentLimit}
+                      onChange={(e) => setDocumentLimit(Number.parseInt(e.target.value || '0'))}
+                      className="w-full rounded-md border border-input bg-background px-2 py-1 text-sm"
+                    />
+                  </div>
+                  <div className="px-3 pt-2 pb-1 text-xs text-muted-foreground flex items-center justify-between">
+                    <span>Connections</span>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        fetchConnections();
+                      }}
+                      className="inline-flex items-center gap-1 text-xs text-foreground hover:underline"
+                    >
+                      <RefreshCw className="h-3 w-3" /> Refresh
+                    </button>
+                  </div>
+                  <ScrollArea className="max-h-80 overflow-y-auto">
+                    {loadingConnections ? (
+                      <div className="px-3 py-2 text-sm text-muted-foreground flex items-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Loading...
+                      </div>
+                    ) : connections.length === 0 ? (
+                      <div className="px-3 py-2 text-sm text-muted-foreground">No connections yet</div>
+                    ) : (
+                      connections.map((conn) => {
+                        const key = conn.connectionId || conn.id || crypto.randomUUID();
+                        return (
+                          <div
+                            key={key}
+                            className="px-3 py-2 text-sm flex items-center justify-between gap-2"
+                          >
+                            <div className="flex flex-col">
+                              <span className="font-medium">{conn.provider || 'Unknown provider'}</span>
+                              <span className="text-xs text-muted-foreground">
+                                {conn.email || 'Unknown user'}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  const targetId = conn.connectionId || conn.id;
+                                  if (targetId && conn.provider) {
+                                    handleSyncConnection(targetId, conn.provider);
+                                  }
+                                }}
+                              className="p-1 rounded hover:bg-accent text-foreground inline-flex items-center gap-1"
+                                aria-label="Sync connection"
+                                title="Sync connection"
+                                disabled={syncingConnectionId === (conn.connectionId || conn.id)}
+                              >
+                                {syncingConnectionId === (conn.connectionId || conn.id) ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                <>
+                                  <RefreshCw className="h-4 w-4" />
+                                  <span className="text-xs">Sync</span>
+                                </>
+                                )}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  const targetId = conn.connectionId || conn.id;
+                                  if (targetId) {
+                                    handleDeleteConnection(targetId);
+                                  }
+                                }}
+                                className="p-1 rounded hover:bg-red-100 dark:hover:bg-red-900/30 text-red-600 dark:text-red-400"
+                                aria-label="Delete connection"
+                                title="Delete connection"
+                                disabled={deletingConnectionId === (conn.connectionId || conn.id)}
+                              >
+                                {deletingConnectionId === (conn.connectionId || conn.id) ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Trash className="h-4 w-4" />
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </ScrollArea>
+                </DropdownMenuContent>
+              </DropdownMenu>
               <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleNewConversation();
-                }}
-                className="p-2 hover:bg-accent rounded-full transition-colors"
-                aria-label="New conversation (keep memories)"
-                title="Start new conversation (keep memories)"
-              >
-                <MessageSquarePlus className="h-5 w-5" />
-              </button>
-              <button
+                type="button"
                 onClick={(e) => {
                   e.stopPropagation();
                   handleDeleteAll();
@@ -1013,6 +1413,7 @@ export function ConversationHeader({
           {!isNewChat && activeConversation && activeConversation.recipients.some(r => r.name === 'Profile') && (
             <div className="ml-auto flex gap-1">
               <button
+                type="button"
                 onClick={(e) => {
                   e.stopPropagation();
                   setShowMemoryGraph(true);

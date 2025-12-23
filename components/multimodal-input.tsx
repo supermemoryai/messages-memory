@@ -20,11 +20,17 @@ import { useLocalStorage, useWindowSize } from 'usehooks-ts';
 import { ArrowUpIcon, PaperclipIcon, StopIcon } from './icons';
 import { PreviewAttachment } from './preview-attachment';
 import { Button } from './ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from './ui/dropdown-menu';
 import { Textarea } from './ui/textarea';
 import equal from 'fast-deep-equal';
 import type { UseChatHelpers } from '@ai-sdk/react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ArrowDown } from 'lucide-react';
+import { ArrowDown, Loader2 } from 'lucide-react';
 import { useScrollToBottom } from '@/hooks/use-scroll-to-bottom';
 import type { VisibilityType } from './visibility-selector';
 
@@ -369,6 +375,7 @@ function PureMultimodalInput({
 
       <div className="absolute bottom-0 p-2 w-fit flex flex-row justify-start">
         <AttachmentsButton fileInputRef={fileInputRef} status={status} />
+        <ConnectDataButton chatId={chatId} status={status} />
       </div>
 
       <div className="absolute bottom-0 right-0 p-2 w-fit flex flex-row justify-end">
@@ -423,6 +430,86 @@ function PureAttachmentsButton({
 }
 
 const AttachmentsButton = memo(PureAttachmentsButton);
+
+function ConnectDataButton({
+  chatId,
+  status,
+}: {
+  chatId: string;
+  status: UseChatHelpers<UIMessage>['status'];
+}) {
+  const [loading, setLoading] = useState(false);
+
+  const handleConnect = useCallback(
+    async (provider: 'google-drive' | 'notion' | 'onedrive' | 'web-crawler' | 'github') => {
+      setLoading(true);
+      try {
+        const res = await fetch('/api/supermemory/connect', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            provider,
+            chatId,
+            documentLimit: 5000,
+          }),
+        });
+
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          toast.error(data.message || 'Failed to start connection');
+          return;
+        }
+
+        const data = await res.json();
+        if (data.authLink) {
+          window.location.href = data.authLink;
+          return;
+        }
+
+        toast.error('No auth link returned from Supermemory');
+      } catch (error) {
+        toast.error('Failed to start connection');
+      } finally {
+        setLoading(false);
+      }
+    },
+    [chatId],
+  );
+
+  const disabled = status !== 'ready' || loading;
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          data-testid="connect-data-button"
+          className="ml-2 rounded-md p-[7px] h-fit border-border hover:bg-accent"
+          variant="ghost"
+          disabled={disabled}
+        >
+          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Connect Data'}
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start">
+        <DropdownMenuItem onClick={() => handleConnect('google-drive')}>
+          Connect Google Drive
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => handleConnect('notion')}>
+          Connect Notion
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => handleConnect('onedrive')}>
+          Connect OneDrive
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => handleConnect('github')}>
+          Connect GitHub
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => handleConnect('web-crawler')}>
+          Connect Web Crawler
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
 
 function PureStopButton({
   stop,

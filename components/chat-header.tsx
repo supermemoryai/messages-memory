@@ -3,11 +3,18 @@
 import type { Session } from 'next-auth';
 import { useRouter } from 'next/navigation';
 import type { UIMessage } from 'ai';
+import { useCallback, useState } from 'react';
 
 import { ModelSelector } from '@/components/model-selector';
 // import { VisibilitySelector, type VisibilityType } from '@/components/visibility-selector';
 import { Button } from '@/components/ui/button';
-import { RotateCcw } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { RotateCcw, Link2, Loader2 } from 'lucide-react';
 import { toast } from '@/components/toast';
 import { generateUUID } from '@/lib/utils';
 
@@ -96,6 +103,52 @@ export function ChatHeader({
     }
   };
 
+  const [connecting, setConnecting] = useState(false);
+  const handleConnect = useCallback(
+    async (provider: 'google-drive' | 'notion' | 'onedrive' | 'web-crawler' | 'github') => {
+      setConnecting(true);
+      try {
+        const res = await fetch('/api/supermemory/connect', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            provider,
+            chatId,
+            documentLimit: 5000,
+          }),
+        });
+
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          toast({
+            type: 'error',
+            description: data.message || 'Failed to start connection',
+          });
+          return;
+        }
+
+        const data = await res.json();
+        if (data.authLink) {
+          window.location.href = data.authLink;
+          return;
+        }
+
+        toast({
+          type: 'error',
+          description: 'No auth link returned from Supermemory',
+        });
+      } catch (error) {
+        toast({
+          type: 'error',
+          description: 'Failed to start connection',
+        });
+      } finally {
+        setConnecting(false);
+      }
+    },
+    [chatId],
+  );
+
   return (
     <header className="flex sticky top-0 bg-background py-2 px-2 md:px-2 gap-2 z-10 border-b">
       <div className="flex flex-row gap-2 items-center">
@@ -103,6 +156,38 @@ export function ChatHeader({
       </div>
 
       <div className="flex flex-1 justify-end items-center gap-2">
+        {!isReadonly && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                title="Connect data source"
+                disabled={connecting}
+              >
+                {connecting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Link2 className="h-4 w-4" />}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => handleConnect('google-drive')}>
+                Connect Google Drive
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleConnect('notion')}>
+                Connect Notion
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleConnect('onedrive')}>
+                Connect OneDrive
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleConnect('github')}>
+                Connect GitHub
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleConnect('web-crawler')}>
+                Connect Web Crawler
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
         {!isReadonly && (
           <Button
             variant="ghost"
