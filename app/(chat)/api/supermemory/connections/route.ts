@@ -33,23 +33,24 @@ export async function GET(request: Request) {
   }
 
   try {
-    // Get connections from both Supermemory and our DB
     const [supermemoryConnections, dbConnections] = await Promise.all([
       listConnections(chatId),
       getChatConnectionsByChatId({ chatId }),
     ]);
 
-    // Merge the data
-    const connections = supermemoryConnections.map(smConn => {
-      const dbConn = dbConnections.find(db => db.supermemoryConnectionId === smConn.id);
+    const smMap = new Map(supermemoryConnections.map((c) => [c.id, c]));
+
+    const connections = dbConnections.map((dbConn) => {
+      const smConn = smMap.get(dbConn.supermemoryConnectionId);
       return {
-        id: dbConn?.id,
-        connectionId: dbConn?.supermemoryConnectionId,
-        provider: dbConn?.provider,
-        email: smConn.email,
-        createdAt: dbConn?.createdAt,
-        documentLimit: smConn.documentLimit,
-        expiresAt: smConn.expiresAt,
+        id: dbConn.id,
+        connectionId: dbConn.supermemoryConnectionId,
+        provider: dbConn.provider,
+        createdAt: dbConn.createdAt,
+        updatedAt: dbConn.updatedAt,
+        email: smConn?.email,
+        documentLimit: smConn?.documentLimit,
+        expiresAt: smConn?.expiresAt,
       };
     });
 
@@ -94,7 +95,7 @@ export async function DELETE(request: Request) {
         const dbConnection = dbConnections.find(c => c.supermemoryConnectionId === connectionId);
 
         if (!dbConnection) {
-        return new ChatSDKError('not_found:connection', 'Connection not found').toResponse();
+        return new ChatSDKError('not_found:api', 'Connection not found').toResponse();
         }
 
         // Delete from Supermemory first

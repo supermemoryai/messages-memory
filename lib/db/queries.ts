@@ -391,6 +391,14 @@ export async function deleteChatConnection({ connectionId }: { connectionId: str
   }
 }
 
+export async function deleteChatConnectionById({ id }: { id: string }) {
+  try {
+    return await db.delete(chatConnection).where(eq(chatConnection.id, id)).returning();
+  } catch (error) {
+    throw new ChatSDKError('bad_request:database', 'Failed to delete chat connection by id');
+  }
+}
+
 export async function saveMessages({
   messages,
 }: {

@@ -1,15 +1,15 @@
 import { auth } from '@/app/(auth)/auth';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { createChatConnection, getChatById, getWorkspaceMember } from '@/lib/db/queries';
+import { getChatById, getWorkspaceMember } from '@/lib/db/queries';
 import { createConnection } from '@/lib/supermemory/client';
 import { ChatSDKError } from '@/lib/errors';
 
 const connectSchema = z.object({
   provider: z.enum(['google-drive', 'notion', 'onedrive', 'web-crawler', 'github']),
-  chatId: z.uuid(),
-  metadata: z.record(z.any(), z.any()).optional(),
-  documentLimit: z.int(),
+  chatId: z.string(),
+  metadata: z.record(z.string(), z.any()).optional(),
+  documentLimit: z.number().int(),
 });
 
 export async function POST(request: Request) {
@@ -55,25 +55,29 @@ export async function POST(request: Request) {
       metadata: body.metadata,
     });
 
-    if (!result) {
-      return new ChatSDKError('bad_request:connection', 'Failed to create connection').toResponse();
-    }
-
-    // // Store connectionId in cache for callback
-    // setPendingConnection(body.chatId, result.connectionId);
-    // Write to DB immediately
-    await createChatConnection({
+    // Set a short-lived pending cookie so callback can write DB after OAuth completes
+    const payload = {
       chatId: body.chatId,
-      workspaceId: chat.workspaceId,
       provider: body.provider,
-      supermemoryConnectionId: result.connectionId,
-    });
+      connectionId: result.connectionId,
+      issuedAt: Date.now(),
+    };
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       authLink: result.authLink,
       connectionId: result.connectionId,
       expiresIn: result.expiresIn,
     });
+
+    response.cookies.set('sm_pending_conn', JSON.stringify(payload), {
+      httpOnly: true,
+      sameSite: 'lax',
+      maxAge: 15 * 60, // 15 minutes
+      path: '/',
+      secure: process.env.NODE_ENV === 'production',
+    });
+
+    return response;
   } catch (error) {
     return new ChatSDKError('bad_request:api', `Failed to create connection: ${error}`).toResponse();
   }
