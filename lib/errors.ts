@@ -16,7 +16,8 @@ export type Surface =
   | 'vote'
   | 'document'
   | 'suggestions'
-  | 'workspace';
+  | 'workspace'
+  | 'connection';
 
 export type ErrorCode = `${ErrorType}:${Surface}`;
 
@@ -33,6 +34,7 @@ export const visibilityBySurface: Record<Surface, ErrorVisibility> = {
   document: 'response',
   suggestions: 'response',
   workspace: 'response',
+  connection: 'response',
 };
 
 export class ChatSDKError extends Error {
@@ -117,6 +119,8 @@ export function getMessageByErrorCode(errorCode: ErrorCode): string {
     case 'bad_request:document':
       return 'The request to create or update the document was invalid. Please check your input and try again.';
 
+    case 'not_found:connection':
+      return 'The requested supermemory connection was not found. Please check the connection ID and try again.';
     default:
       return 'Something went wrong. Please try again later.';
   }
