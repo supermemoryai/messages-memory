@@ -57,6 +57,13 @@
       "when": 1766102400000,
       "tag": "0007_add_workspaces",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1766461673184,
+      "tag": "0008_absent_madrox",
+      "breakpoints": true
     }
   ]
 }
