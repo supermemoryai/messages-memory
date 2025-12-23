@@ -74,6 +74,24 @@ export const chat = pgTable('Chat', {
 
 export type Chat = InferSelectModel<typeof chat>;
 
+export const chatConnection = pgTable('ChatConnection', {
+  id: uuid('id').primaryKey().notNull().defaultRandom(),
+  chatId: uuid('chatId')
+    .notNull()
+    .references(() => chat.id, { onDelete: 'cascade' }),
+  workspaceId: uuid('workspaceId')
+    .notNull()
+    .references(() => workspace.id, { onDelete: 'cascade' }),
+  provider: varchar('provider', {
+    enum: ['google-drive', 'notion', 'onedrive', 'web-crawler', 'github']
+  }).notNull(),
+  supermemoryConnectionId: varchar('supermemoryConnectionId', { 
+    length: 255 
+  }).notNull(),
+  createdAt: timestamp('createdAt').notNull(),
+  updatedAt: timestamp('updatedAt').notNull(),
+});
+
 // DEPRECATED: The following schema is deprecated and will be removed in the future.
 // Read the migration guide at https://chat-sdk.dev/docs/migration-guides/message-parts
 export const messageDeprecated = pgTable('Message', {

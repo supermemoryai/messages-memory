@@ -30,12 +30,14 @@ import {
   workspace,
   workspaceMember,
   invitation,
+  chatConnection,
 } from './schema';
 import type { ArtifactKind } from '@/components/artifact';
 import { generateUUID } from '../utils';
 import { generateHashedPassword } from './utils';
 import type { VisibilityType } from '@/components/visibility-selector';
 import { ChatSDKError } from '../errors';
+import type { Provider } from '../supermemory/client';
 
 // Optionally, if not using email/pass login, you can
 // use the Drizzle adapter for Auth.js / NextAuth
@@ -344,6 +346,48 @@ export async function getChatById({ id }: { id: string }) {
     return selectedChat;
   } catch (error) {
     throw new ChatSDKError('bad_request:database', 'Failed to get chat by id');
+  }
+}
+
+export async function createChatConnection({
+  chatId,
+  workspaceId,
+  provider,
+  supermemoryConnectionId,
+}: {
+  chatId: string;
+  workspaceId: string;
+  provider: Provider;
+  supermemoryConnectionId: string;
+}) {
+  try {
+    const now = new Date();
+    return await db.insert(chatConnection).values({
+      chatId,
+      workspaceId,
+      provider,
+      supermemoryConnectionId,
+      createdAt: now,
+      updatedAt: now,
+    }).returning();
+  } catch (error) {
+    throw new ChatSDKError('bad_request:database', 'Failed to create chat connection');
+  }
+}
+
+export async function getChatConnectionsByChatId({ chatId }: { chatId: string }) {
+  try {
+    return await db.select().from(chatConnection).where(eq(chatConnection.chatId, chatId));
+  } catch (error) {
+    throw new ChatSDKError('bad_request:database', 'Failed to get chat connections');
+  }
+}
+
+export async function deleteChatConnection({ id }: { id: string }) {
+  try {
+    return await db.delete(chatConnection).where(eq(chatConnection.id, id)).returning();
+  } catch (error) {
+    throw new ChatSDKError('bad_request:database', 'Failed to delete chat connection');
   }
 }
 
